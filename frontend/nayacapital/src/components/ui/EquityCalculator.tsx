@@ -33,7 +33,7 @@ export const EquityCalculator: React.FC<EquityCalculatorProps> = ({
     <div className="space-y-4">
       <div>
         <label className="block text-xs font-semibold text-ink-secondary mb-2 uppercase tracking-wide">
-          Investment Amount (Min Rs 1)
+          Investment Amount (Min Rs 100)
         </label>
         <div className="relative">
           <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-ink-secondary font-mono">
@@ -43,7 +43,7 @@ export const EquityCalculator: React.FC<EquityCalculatorProps> = ({
             type="number"
             value={amount || ''}
             onChange={handleInputChange}
-            placeholder="50,000"
+            placeholder="100"
             className="w-full pl-12 pr-4 py-4 border-2 border-surface-2 rounded-xl bg-surface-0 text-ink-primary font-mono text-xl font-semibold placeholder-ink-ghost focus:outline-none focus:border-brand-600 transition-colors"
           />
         </div>

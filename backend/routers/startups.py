@@ -148,7 +148,7 @@ async def create_startup(
                 "funding_goal": body.funding_goal,
                 "amount_raised": 0,
                 "equity_offered": body.equity_offered,
-                "status": "pending",
+                "status": "active",
                 "pitch_deck_url": body.pitch_deck_url,
             }
         )

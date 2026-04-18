@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckIcon, ShieldCheckIcon, SparklesIcon } from '@heroicons/react/24/solid'
@@ -6,6 +7,7 @@ import toast from 'react-hot-toast'
 import { FundingBar } from '../components/ui/FundingBar'
 import { MilestoneTimeline } from '../components/ui/MilestoneTimeline'
 import { EquityCalculator } from '../components/ui/EquityCalculator'
+import { useAuth } from '../contexts/AuthContext'
 import { useStartup, useInvest, useRealtimeFundingUpdates } from '../hooks'
 
 interface Startup {
@@ -82,6 +84,8 @@ type TabType = 'story' | 'pitch' | 'team'
 
 const StartupDetailPage: React.FC = () => {
   const { id } = useParams()
+  const { user } = useAuth()
+  const walletBalance = user?.wallet_balance || 0
   const { startup, loading, error, refetch } = useStartup(id || '')
   const { invest, loading: isInvesting } = useInvest()
   
@@ -188,6 +192,7 @@ const StartupDetailPage: React.FC = () => {
           onAmountChange={setInvestmentAmount}
           onInvest={() => setShowConfirm(true)}
           displayedAmount={displayedAmount}
+          walletBalance={walletBalance}
         />
       </div>
 
@@ -427,130 +432,134 @@ const StartupDetailPage: React.FC = () => {
             onAmountChange={setInvestmentAmount}
             onInvest={() => setShowConfirm(true)}
             displayedAmount={displayedAmount}
+            walletBalance={walletBalance}
           />
         </div>
       </div>
 
       {/* Confirmation Modal */}
-      <AnimatePresence>
-        {showConfirm && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => !isInvesting && !investSuccess && setShowConfirm(false)}
-          >
+      {createPortal(
+        <AnimatePresence>
+          {showConfirm && (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
+              onClick={() => !isInvesting && !investSuccess && setShowConfirm(false)}
             >
-              {investSuccess ? (
-                <motion.div
-                  key="success"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-center space-y-4"
-                >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
+              >
+                {investSuccess ? (
                   <motion.div
-                    animate={{ scale: [1, 1.1, 0.9, 1.1, 0.95] }}
-                    transition={{ duration: 0.6 }}
-                    className="w-20 h-20 mx-auto bg-brand-100 rounded-full flex items-center justify-center"
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center space-y-4"
                   >
-                    <CheckIcon className="w-10 h-10 text-brand-600" />
-                  </motion.div>
-                  <div>
-                    <h3 className="font-playfair text-2xl font-bold text-ink-primary">
-                      Investment Confirmed!
-                    </h3>
-                    <p className="text-sm text-ink-secondary mt-2">
-                      You now own {equityPercentage.toFixed(4)}% of {startup.name}
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 0.9, 1.1, 0.95] }}
+                      transition={{ duration: 0.6 }}
+                      className="w-20 h-20 mx-auto bg-brand-100 rounded-full flex items-center justify-center"
+                    >
+                      <CheckIcon className="w-10 h-10 text-brand-600" />
+                    </motion.div>
+                    <div>
+                      <h3 className="font-playfair text-2xl font-bold text-ink-primary">
+                        Investment Confirmed!
+                      </h3>
+                      <p className="text-sm text-ink-secondary mt-2">
+                        You now own {equityPercentage.toFixed(4)}% of {startup.name}
+                      </p>
+                    </div>
+                    <p className="text-xs text-ink-ghost">
+                      Funds will be held in escrow until milestone verification
                     </p>
-                  </div>
-                  <p className="text-xs text-ink-ghost">
-                    Funds will be held in escrow until milestone verification
-                  </p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="confirm"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="space-y-6"
-                >
-                  <div>
-                    <h3 className="font-playfair text-2xl font-bold text-ink-primary">
-                      Confirm Investment
-                    </h3>
-                  </div>
-
-                  {/* Investment Summary */}
-                  <div className="space-y-3 p-4 rounded-xl bg-surface-1 border border-surface-3">
-                    <div className="flex justify-between">
-                      <span className="text-ink-secondary">Investment Amount:</span>
-                      <span className="font-mono font-semibold text-ink-primary">
-                        Rs {investmentAmount.toLocaleString()}
-                      </span>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="confirm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-6"
+                  >
+                    <div>
+                      <h3 className="font-playfair text-2xl font-bold text-ink-primary">
+                        Confirm Investment
+                      </h3>
                     </div>
-                    <div className="h-px bg-surface-3" />
-                    <div className="flex justify-between">
-                      <span className="text-ink-secondary">Equity Stake:</span>
-                      <span className="font-mono font-bold text-brand-600">
-                        {equityPercentage.toFixed(4)}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-ink-secondary">Company:</span>
-                      <span className="font-semibold text-ink-primary">{startup.name}</span>
-                    </div>
-                  </div>
 
-                  {/* Security Note */}
-                  <p className="text-xs text-ink-secondary bg-brand-50 p-3 rounded-lg">
-                    🔒 Your funds are held in escrow until milestones are verified and released according to schedule
-                  </p>
+                    {/* Investment Summary */}
+                    <div className="space-y-3 p-4 rounded-xl bg-surface-1 border border-surface-3">
+                      <div className="flex justify-between">
+                        <span className="text-ink-secondary">Investment Amount:</span>
+                        <span className="font-mono font-semibold text-ink-primary">
+                          Rs {investmentAmount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="h-px bg-surface-3" />
+                      <div className="flex justify-between">
+                        <span className="text-ink-secondary">Equity Stake:</span>
+                        <span className="font-mono font-bold text-brand-600">
+                          {equityPercentage.toFixed(4)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-ink-secondary">Company:</span>
+                        <span className="font-semibold text-ink-primary">{startup.name}</span>
+                      </div>
+                    </div>
 
-                  {/* Buttons */}
-                  <div className="flex gap-3">
-                    <motion.button
-                      onClick={() => setShowConfirm(false)}
-                      disabled={isInvesting}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="flex-1 px-4 py-3 border border-surface-3 rounded-lg font-medium text-ink-primary hover:bg-surface-1 transition-colors disabled:opacity-50"
-                    >
-                      Cancel
-                    </motion.button>
-                    <motion.button
-                      onClick={handleInvest}
-                      disabled={isInvesting}
-                      whileHover={{ scale: isInvesting ? 1 : 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="flex-1 px-4 py-3 bg-brand-600 hover:bg-brand-700 rounded-lg font-medium text-white transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                      {isInvesting ? (
-                        <>
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                          />
-                          Processing...
-                        </>
-                      ) : (
-                        'Confirm & Invest'
-                      )}
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )}
+                    {/* Security Note */}
+                    <p className="text-xs text-ink-secondary bg-brand-50 p-3 rounded-lg">
+                      🔒 Your funds are held in escrow until milestones are verified and released according to schedule
+                    </p>
+
+                    {/* Buttons */}
+                    <div className="flex gap-3">
+                      <motion.button
+                        onClick={() => setShowConfirm(false)}
+                        disabled={isInvesting}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 px-4 py-3 border border-surface-3 rounded-lg font-medium text-ink-primary hover:bg-surface-1 transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </motion.button>
+                      <motion.button
+                        onClick={handleInvest}
+                        disabled={isInvesting}
+                        whileHover={{ scale: isInvesting ? 1 : 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 px-4 py-3 bg-brand-600 hover:bg-brand-700 rounded-lg font-medium text-white transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                      >
+                        {isInvesting ? (
+                          <>
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                              className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                            />
+                            Processing...
+                          </>
+                        ) : (
+                          'Confirm & Invest'
+                        )}
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }
@@ -562,6 +571,7 @@ interface InvestmentWidgetProps {
   onAmountChange: (amount: number) => void
   onInvest: () => void
   displayedAmount: number
+  walletBalance: number
 }
 
 const InvestmentWidget: React.FC<InvestmentWidgetProps & { displayedAmount: number }> = ({
@@ -570,8 +580,11 @@ const InvestmentWidget: React.FC<InvestmentWidgetProps & { displayedAmount: numb
   onAmountChange,
   onInvest,
   displayedAmount,
+  walletBalance,
 }) => {
   const fundedPercent = (displayedAmount / startup.funding_goal) * 100
+  const minInvestment = startup.min_investment || 100
+  const isOverBalance = investmentAmount > walletBalance
 
   return (
     <motion.div
@@ -610,28 +623,39 @@ const InvestmentWidget: React.FC<InvestmentWidgetProps & { displayedAmount: numb
       </div>
 
       {/* Equity Calculator */}
-      <EquityCalculator
-        amount={investmentAmount}
-        fundingGoal={startup.funding_goal}
-        equityOffered={startup.equity_offered}
-        onAmountChange={onAmountChange}
-      />
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-ink-secondary">Wallet Balance</span>
+          <span className="font-mono font-semibold text-ink-primary">Rs {walletBalance.toLocaleString()}</span>
+        </div>
+        <EquityCalculator
+          amount={investmentAmount}
+          fundingGoal={startup.funding_goal}
+          equityOffered={startup.equity_offered}
+          onAmountChange={onAmountChange}
+        />
+        {isOverBalance && (
+          <p className="text-xs text-red-600">Your investment cannot exceed your available wallet balance.</p>
+        )}
+      </div>
 
       {/* Invest Button */}
       <motion.button
         onClick={onInvest}
-        disabled={investmentAmount < (startup.min_investment || 50000)}
-        whileHover={investmentAmount >= (startup.min_investment || 50000) ? { scale: 1.05 } : {}}
-        whileTap={investmentAmount >= (startup.min_investment || 50000) ? { scale: 0.95 } : {}}
+        disabled={investmentAmount < minInvestment || isOverBalance}
+        whileHover={investmentAmount >= minInvestment && !isOverBalance ? { scale: 1.05 } : {}}
+        whileTap={investmentAmount >= minInvestment && !isOverBalance ? { scale: 0.95 } : {}}
         className={`w-full py-4 rounded-full font-bold text-lg transition-all ${
-          investmentAmount >= (startup.min_investment || 50000)
+          investmentAmount >= minInvestment && !isOverBalance
             ? 'bg-brand-600 hover:bg-brand-700 text-white cursor-pointer'
             : 'bg-surface-2 text-ink-secondary cursor-not-allowed'
         }`}
       >
-        {investmentAmount >= (startup.min_investment || 50000)
-          ? 'Invest Now'
-          : `Min Rs ${((startup.min_investment || 50000) / 1000).toFixed(0)}K`}
+        {isOverBalance 
+          ? 'Insufficient Balance' 
+          : investmentAmount >= minInvestment
+            ? 'Invest Now'
+            : `Min Rs ${minInvestment.toLocaleString()}`}
       </motion.button>
 
       {/* Security Badge */}
