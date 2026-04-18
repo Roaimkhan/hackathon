@@ -51,7 +51,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 1650000,
     funding_goal: 2500000,
     investors_count: 342,
-    min_investment: 50000,
+    min_investment: 100,
   },
   {
     id: '2',
@@ -63,7 +63,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 1200000,
     funding_goal: 2500000,
     investors_count: 287,
-    min_investment: 100000,
+    min_investment: 100,
   },
   {
     id: '3',
@@ -75,7 +75,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 2050000,
     funding_goal: 2500000,
     investors_count: 521,
-    min_investment: 50000,
+    min_investment: 100,
   },
   {
     id: '4',
@@ -87,7 +87,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 950000,
     funding_goal: 2000000,
     investors_count: 198,
-    min_investment: 75000,
+    min_investment: 100,
   },
   {
     id: '5',
@@ -99,7 +99,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 1500000,
     funding_goal: 2500000,
     investors_count: 412,
-    min_investment: 50000,
+    min_investment: 100,
   },
   {
     id: '6',
@@ -111,7 +111,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 800000,
     funding_goal: 1500000,
     investors_count: 156,
-    min_investment: 100000,
+    min_investment: 100,
   },
   {
     id: '7',
@@ -123,7 +123,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 2200000,
     funding_goal: 3000000,
     investors_count: 623,
-    min_investment: 50000,
+    min_investment: 100,
   },
   {
     id: '8',
@@ -135,7 +135,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 1350000,
     funding_goal: 2000000,
     investors_count: 289,
-    min_investment: 75000,
+    min_investment: 100,
   },
   {
     id: '9',
@@ -147,7 +147,7 @@ const MOCK_STARTUPS: Startup[] = [
     amount_raised: 650000,
     funding_goal: 1500000,
     investors_count: 124,
-    min_investment: 50000,
+    min_investment: 100,
   },
 ];
 
@@ -215,7 +215,7 @@ export const StartupListPage: React.FC = () => {
         amount_raised: item.amount_raised,
         funding_goal: item.funding_goal,
         investors_count: item.investor_count || 0,
-        min_investment: item.min_investment || 1000,
+        min_investment: item.min_investment || 100,
       }
     });
 
@@ -511,7 +511,7 @@ export const StartupListPage: React.FC = () => {
                     {/* Footer */}
                     <div className="flex items-center justify-between gap-2 mt-auto">
                       <div className="px-2 py-1 rounded bg-gold-100 text-gold-900 text-xs font-semibold">
-                        Min: Rs {(startup.min_investment / 1000).toFixed(0)}K
+                        Min: Rs {startup.min_investment.toLocaleString()}
                       </div>
                       <motion.button
                         onClick={() => navigate(`/startups/${startup.id}`)}

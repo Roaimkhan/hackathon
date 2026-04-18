@@ -161,7 +161,12 @@ const Navbar: React.FC = () => {
                         Dashboard
                       </Link>
                       <Link
-                        to="/kyc"
+                        to={
+                          user.role === 'investor'
+                            ? '/dashboard/investor'
+                            : '/dashboard/founder'
+                        }
+                        state={{ tab: 'settings' }}
                         onClick={() => setDropdownOpen(false)}
                         className="block px-4 py-2 text-sm text-ink-secondary hover:bg-surface-2 transition-colors"
                       >

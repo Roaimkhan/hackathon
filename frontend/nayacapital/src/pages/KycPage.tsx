@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheckIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import { useAuth } from '../contexts/AuthContext';
-import { FloatingLabelInput } from '../components/ui/FloatingLabelInput';
 import { api } from '../lib/api';
 
 export const KycPage: React.FC = () => {
@@ -111,7 +110,17 @@ export const KycPage: React.FC = () => {
             >
               {/* Progress Step */}
               <div className="flex items-center justify-between mb-8">
-                <div>
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="text-sm font-semibold text-ink-secondary hover:text-ink-primary transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back
+                </button>
+                <div className="text-right">
                   <p className="text-xs font-semibold text-brand-600 uppercase">Step 1 of 1</p>
                   <p className="text-sm text-ink-secondary">Verify Your Identity</p>
                 </div>
@@ -148,48 +157,37 @@ export const KycPage: React.FC = () => {
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-0">
                 {/* CNIC Input */}
-                <div className="relative mb-6">
-                  <div
-                    className={`relative border-b-2 transition-colors ${
-                      error
-                        ? 'border-red-500'
-                        : 'border-surface-2 focus-within:border-brand-600'
-                    }`}
-                  >
-                    <motion.label
-                      animate={{
-                        y: cnic ? -24 : 0,
-                        fontSize: cnic ? '12px' : '16px',
-                      }}
-                      transition={{ duration: 0.2 }}
-                      className={`absolute transition-colors ${
-                        cnic ? 'text-brand-600' : 'text-ink-secondary'
-                      } pointer-events-none`}
-                    >
-                      CNIC Number
-                    </motion.label>
-                    <input
-                      type="text"
-                      value={cnic}
-                      onChange={(e) => handleCnicChange(e.target.value)}
-                      placeholder="00000-0000000-0"
-                      maxLength={15}
-                      className="w-full bg-transparent py-3 text-ink-primary outline-none font-mono"
-                    />
-                  </div>
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-ink-primary mb-2">
+                    CNIC Number
+                  </label>
+                  <input
+                    type="text"
+                    value={cnic}
+                    onChange={(e) => handleCnicChange(e.target.value)}
+                    placeholder="00000-0000000-0"
+                    maxLength={15}
+                    className="w-full bg-surface-1 border border-surface-2 rounded-lg py-3 px-4 text-ink-primary outline-none focus:border-brand-600 focus:bg-white transition-colors font-mono"
+                  />
                   <p className="text-xs text-ink-secondary mt-2">
                     Format: 00000-0000000-0
                   </p>
                 </div>
 
                 {/* Full Name */}
-                <FloatingLabelInput
-                  label="Full Name"
-                  type="text"
-                  value={fullName}
-                  onChange={setFullName}
-                  required
-                />
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-ink-primary mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter your full name"
+                    required
+                    className="w-full bg-surface-1 border border-surface-2 rounded-lg py-3 px-4 text-ink-primary outline-none focus:border-brand-600 focus:bg-white transition-colors"
+                  />
+                </div>
 
                 {/* Error Message */}
                 {error && (

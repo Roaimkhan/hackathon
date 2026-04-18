@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useFounder } from '../hooks'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -44,13 +44,13 @@ interface FormData {
   name: string
   sector: string
   tagline: string
-  funding_goal: number
-  equity_offered: number
+  funding_goal: number | string
+  equity_offered: number | string
   story: string
-  pitch_deck?: File
+  pitch_video_url?: string
   milestones: Array<{
     title: string
-    fund_percentage: number
+    fund_percentage: number | string
     description: string
   }>
 }
@@ -65,7 +65,7 @@ const Sidebar: React.FC<{ activeTab: string; setActiveTab: (tab: string) => void
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: HomeIcon },
-    { id: 'startup', label: 'My Startup', icon: RocketLaunchIcon },
+    { id: 'startup', label: 'My Startups', icon: RocketLaunchIcon },
     { id: 'milestones', label: 'Milestones', icon: FlagIcon },
     { id: 'documents', label: 'Documents', icon: DocumentTextIcon },
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon },
@@ -81,7 +81,7 @@ const Sidebar: React.FC<{ activeTab: string; setActiveTab: (tab: string) => void
   }
 
   return (
-    <div className="fixed left-0 top-0 h-screen w-60 bg-brand-950 text-white flex flex-col border-r border-brand-900 pt-20">
+    <div className="sticky top-0 h-screen w-60 shrink-0 bg-brand-950 text-white flex flex-col border-r border-brand-900 pt-20">
       {/* Nav Items */}
       <nav className="flex-1 px-4 py-8 space-y-2">
         {navItems.map((item) => {
@@ -166,17 +166,18 @@ const NoStartupState: React.FC<{ onCreateClick: () => void }> = ({ onCreateClick
 )
 
 // Multi-Step Form
-const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise<void> | void; onCancel: () => void }> = ({
-  onSuccess,
-  onCancel,
-}) => {
+const StartupCreationForm: React.FC<{
+  onSuccess: (data: FormData) => Promise<void>
+  onCancel: () => void
+  isSubmitting?: boolean
+}> = ({ onSuccess, onCancel, isSubmitting }) => {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>({
     name: '',
     sector: '',
     tagline: '',
-    funding_goal: 0,
-    equity_offered: 0,
+    funding_goal: '',
+    equity_offered: '',
     story: '',
     milestones: [],
   })
@@ -187,7 +188,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
   const isMilestonesSumValid = useMemo(
     () => {
       if (formData.milestones.length === 0) return false
-      const sum = formData.milestones.reduce((acc, m) => acc + m.fund_percentage, 0)
+      const sum = formData.milestones.reduce((acc, m) => acc + (Number(m.fund_percentage) || 0), 0)
       return Math.abs(sum - 100) < 0.01
     },
     [formData.milestones]
@@ -196,7 +197,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
   const canProceed = () => {
     switch (step) {
       case 1:
-        return formData.name && formData.sector && formData.tagline && formData.funding_goal > 0
+        return formData.name && formData.sector && formData.tagline && Number(formData.funding_goal) > 0
       case 2:
         return formData.story.length > 20
       case 3:
@@ -213,7 +214,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
       ...prev,
       milestones: [
         ...prev.milestones,
-        { title: '', fund_percentage: 0, description: '' },
+        { title: '', fund_percentage: '', description: '' },
       ],
     }))
   }
@@ -364,7 +365,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          funding_goal: parseInt(e.target.value) || 0,
+                          funding_goal: e.target.value,
                         }))
                       }
                       placeholder="2000000"
@@ -381,7 +382,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
                       onChange={(e) =>
                         setFormData((prev) => ({
                           ...prev,
-                          equity_offered: parseFloat(e.target.value) || 0,
+                          equity_offered: e.target.value,
                         }))
                       }
                       placeholder="20"
@@ -421,20 +422,39 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
 
                 <div>
                   <label className="block text-sm font-semibold text-ink-primary mb-3">
-                    Pitch Deck
+                    Pitch Video (YouTube URL)
                   </label>
-                  <motion.div
-                    whileHover={{ borderColor: '#16A34A', backgroundColor: '#F0FDF4' }}
-                    className="border-2 border-dashed border-surface-3 rounded-lg p-8 text-center cursor-pointer transition-all"
-                  >
-                    <ArrowUpTrayIcon className="w-8 h-8 text-brand-600 mx-auto mb-2" />
-                    <p className="text-sm font-semibold text-ink-primary mb-1">
-                      Drop your pitch deck here
-                    </p>
-                    <p className="text-xs text-ink-secondary">
-                      PDF, PPT, or Google Slides link
-                    </p>
-                  </motion.div>
+                  <input
+                    type="url"
+                    value={formData.pitch_video_url || ''}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, pitch_video_url: e.target.value }))
+                    }
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full border border-surface-3 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 mb-4"
+                  />
+                  {formData.pitch_video_url && (
+                    <div className="w-full aspect-video bg-surface-1 rounded-lg overflow-hidden border border-surface-2 flex items-center justify-center">
+                      {(() => {
+                        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+                        const match = formData.pitch_video_url.match(regExp)
+                        const isYoutube = match && match[2].length === 11
+                        if (isYoutube) {
+                          return (
+                            <iframe
+                              className="w-full h-full"
+                              src={`https://www.youtube.com/embed/${match[2]}`}
+                              title="Pitch Video Preview"
+                              frameBorder="0"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                            />
+                          )
+                        }
+                        return <p className="text-sm text-ink-secondary">Invalid YouTube URL</p>
+                      })()}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -459,7 +479,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
                           : 'bg-red-100 text-red-700'
                       }`}
                     >
-                      {formData.milestones.reduce((sum, m) => sum + m.fund_percentage, 0)}%
+                      {formData.milestones.reduce((sum, m) => sum + (Number(m.fund_percentage) || 0), 0)}%
                     </span>
                   </div>
 
@@ -486,11 +506,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
                               type="number"
                               value={milestone.fund_percentage}
                               onChange={(e) =>
-                                handleMilestoneChange(
-                                  idx,
-                                  'fund_percentage',
-                                  parseFloat(e.target.value) || 0
-                                )
+                                handleMilestoneChange(idx, 'fund_percentage', e.target.value)
                               }
                               placeholder="0"
                               min="0"
@@ -564,7 +580,7 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
                     <div>
                       <p className="text-xs text-ink-secondary mb-1">Funding Goal</p>
                       <p className="font-mono text-ink-primary">
-                        Rs {formData.funding_goal.toLocaleString()}
+                        Rs {Number(formData.funding_goal).toLocaleString()}
                       </p>
                     </div>
                     <div>
@@ -609,12 +625,19 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
           </motion.button>
           <motion.button
             onClick={() => (step < 4 ? setStep(step + 1) : handleSubmit())}
-            disabled={!canProceed()}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex-1 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={!canProceed() || isSubmitting}
+            whileHover={{ scale: isSubmitting ? 1 : 1.02 }}
+            whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
+            className="flex-1 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
-            {step === 4 ? 'Submit for Review' : 'Next'}
+            {isSubmitting ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              step === 4 ? 'Submit for Review' : 'Next'
+            )}
           </motion.button>
         </div>
       </motion.div>
@@ -622,9 +645,268 @@ const StartupCreationForm: React.FC<{ onSuccess: (formData: FormData) => Promise
   )
 }
 
+// Multi-Startup List View
+const StartupsListView: React.FC<{ startups: Startup[], onSelect: (id: string) => void, onCreateClick: () => void }> = ({ startups, onSelect, onCreateClick }) => {
+  if (startups.length === 0) {
+    return <NoStartupState onCreateClick={onCreateClick} />
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-playfair font-bold text-ink-primary">My Startups</h2>
+          <p className="text-sm text-ink-secondary">Manage your active fundraising campaigns</p>
+        </div>
+        <motion.button
+          onClick={onCreateClick}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="bg-brand-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-brand-700 transition-colors flex items-center gap-2 text-sm"
+        >
+          <PlusIcon className="w-4 h-4" />
+          Create New listing
+        </motion.button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {startups.map((s) => {
+          const fundingPercentage = (s.amount_raised / s.funding_goal) * 100
+          
+          return (
+            <motion.div
+              key={s.id}
+              onClick={() => onSelect(s.id)}
+              whileHover={{ y: -4, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+              className="bg-white border border-surface-2 rounded-2xl p-6 cursor-pointer hover:border-brand-300 transition-all shadow-sm"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="font-bold text-lg text-ink-primary truncate">{s.name}</h3>
+                  <span className="text-xs bg-brand-50 text-brand-700 px-2 py-1 rounded inline-block mt-1">
+                    {s.sector}
+                  </span>
+                </div>
+                <div className={`w-3 h-3 rounded-full ${s.status === 'active' ? 'bg-green-500' : s.status === 'pending' || s.status === 'under_review' ? 'bg-yellow-500' : 'bg-blue-500'}`} />
+              </div>
+              
+              <p className="text-sm text-ink-secondary line-clamp-2 mb-6 h-10">{s.tagline}</p>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-ink-secondary">Funded</span>
+                  <span className="font-semibold text-brand-600">{fundingPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-surface-2 rounded-full h-2">
+                  <div className="bg-brand-600 h-2 rounded-full" style={{ width: `${Math.min(fundingPercentage, 100)}%` }} />
+                </div>
+                <div className="flex justify-between text-xs mt-2">
+                  <span className="text-ink-secondary">Raised: Rs {s.amount_raised.toLocaleString()}</span>
+                  <span className="text-ink-secondary">Goal: Rs {s.funding_goal.toLocaleString()}</span>
+                </div>
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+    </motion.div>
+  )
+}
+
+// Milestone Manager Component
+const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (milestoneId: string) => Promise<void>; proofSubmitting: boolean }> = ({ startup, onSubmitProof, proofSubmitting }) => {
+  const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="bg-white rounded-2xl shadow-md p-6"
+    >
+      <h3 className="text-lg font-display font-bold text-ink-primary mb-4">
+        Milestone Manager
+      </h3>
+
+      <div className="space-y-3">
+        {startup.milestones.map((milestone, idx) => {
+          const isPreviousApproved = idx === 0 || startup.milestones[idx - 1].status === 'approved'
+          const canSubmitProof = milestone.status === 'pending' && isPreviousApproved
+
+          return (
+            <motion.div
+              key={milestone.id}
+              onClick={() =>
+                setExpandedMilestone(expandedMilestone === milestone.id ? null : milestone.id)
+              }
+              className="border border-surface-2 rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer"
+            >
+              <div className="bg-surface-1 p-4 flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-ink-primary">{milestone.title}</p>
+                    <span className="text-xs font-mono bg-brand-100 text-brand-700 px-2 py-1 rounded">
+                      {milestone.fund_percentage}%
+                    </span>
+                  </div>
+                  <p className="text-sm text-ink-secondary">{milestone.description}</p>
+                </div>
+
+                {/* Status Badge */}
+                <div className="ml-4 flex-shrink-0">
+                  {milestone.status === 'approved' && (
+                    <div className="flex items-center gap-1">
+                      <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                      <span className="text-xs font-semibold text-green-700">Approved</span>
+                    </div>
+                  )}
+                  {milestone.status === 'submitted' && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs font-semibold text-yellow-700">Reviewing</span>
+                    </div>
+                  )}
+                  {milestone.status === 'pending' && (
+                    <span className="text-xs font-semibold text-ink-secondary">Pending</span>
+                  )}
+                  {milestone.status === 'rejected' && (
+                    <div className="flex items-center gap-1">
+                      <ExclamationCircleIcon className="w-5 h-5 text-red-600" />
+                      <span className="text-xs font-semibold text-red-700">Rejected</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              <AnimatePresence>
+                {expandedMilestone === milestone.id && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="border-t border-surface-2 p-4 bg-white"
+                  >
+                    {milestone.status === 'approved' && (
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-green-600 font-semibold text-sm mb-4"
+                      >
+                        ✓ Rs {(startup.funding_goal * milestone.fund_percentage) / 100} released to
+                        your account
+                      </motion.p>
+                    )}
+
+                    {milestone.status === 'rejected' && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="mb-4 p-3 bg-red-50 rounded-lg"
+                      >
+                        <p className="text-xs font-semibold text-red-700 mb-2">Rejection Reason:</p>
+                        <p className="text-sm text-red-600">
+                          {milestone.rejection_reason ||
+                            'Please resubmit with additional documentation'}
+                        </p>
+                      </motion.div>
+                    )}
+
+                    {canSubmitProof && (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSubmitProof(milestone.id)
+                        }}
+                        disabled={proofSubmitting}
+                        className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-700 transition-colors flex items-center gap-2"
+                      >
+                        <ArrowUpTrayIcon className="w-4 h-4" />
+                        {proofSubmitting ? 'Submitting...' : 'Submit Proof'}
+                      </motion.button>
+                    )}
+
+                    {milestone.status === 'rejected' && (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSubmitProof(milestone.id)
+                        }}
+                        disabled={proofSubmitting}
+                        className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-700 transition-colors flex items-center gap-2"
+                      >
+                        <ArrowUpTrayIcon className="w-4 h-4" />
+                        {proofSubmitting ? 'Submitting...' : 'Resubmit'}
+                      </motion.button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )
+        })}
+      </div>
+    </motion.div>
+  )
+}
+
+// Full Milestones Tab View
+const MilestonesTabView: React.FC<{
+  startups: Startup[];
+  activeStartup: Startup | null;
+  onSelect: (id: string) => void;
+  onSubmitProof: (id: string) => Promise<void>;
+  proofSubmitting: boolean;
+}> = ({ startups, activeStartup, onSelect, onSubmitProof, proofSubmitting }) => {
+  if (startups.length === 0) {
+    return (
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
+        <p className="text-ink-secondary mb-4">You haven't listed any startups yet.</p>
+      </motion.div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-2 pb-4 overflow-x-auto border-b border-surface-2 hide-scrollbar">
+        {startups.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onSelect(s.id)}
+            className={`px-4 py-2 rounded-full whitespace-nowrap text-sm font-semibold transition-colors ${
+              activeStartup?.id === s.id
+                ? 'bg-brand-600 text-white shadow-md'
+                : 'bg-surface-1 text-ink-secondary hover:bg-surface-2 border border-surface-3'
+            }`}
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+
+      {activeStartup ? (
+        <MilestoneManagerComponent
+          startup={activeStartup}
+          onSubmitProof={onSubmitProof}
+          proofSubmitting={proofSubmitting}
+        />
+      ) : (
+        <p className="text-center text-ink-secondary py-12">Please select a startup above</p>
+      )}
+    </div>
+  )
+}
+
 // Has Startup View
 const StartupManagementView: React.FC<{ startup: Startup; onSubmitProof: (milestoneId: string) => Promise<void>; proofSubmitting: boolean }> = ({ startup, onSubmitProof, proofSubmitting }) => {
-  const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null)
 
   const statusConfig: {
     [key: string]: { bg: string; text: string; label: string; icon: React.ReactNode }
@@ -754,139 +1036,7 @@ const StartupManagementView: React.FC<{ startup: Startup; onSubmitProof: (milest
       </motion.div>
 
       {/* Milestone Manager */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="bg-white rounded-2xl shadow-md p-6"
-      >
-        <h3 className="text-lg font-display font-bold text-ink-primary mb-4">
-          Milestone Manager
-        </h3>
-
-        <div className="space-y-3">
-          {startup.milestones.map((milestone, idx) => {
-            const isPreviousApproved = idx === 0 || startup.milestones[idx - 1].status === 'approved'
-            const canSubmitProof = milestone.status === 'pending' && isPreviousApproved
-
-            return (
-              <motion.div
-                key={milestone.id}
-                onClick={() =>
-                  setExpandedMilestone(expandedMilestone === milestone.id ? null : milestone.id)
-                }
-                className="border border-surface-2 rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer"
-              >
-                <div className="bg-surface-1 p-4 flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-ink-primary">{milestone.title}</p>
-                      <span className="text-xs font-mono bg-brand-100 text-brand-700 px-2 py-1 rounded">
-                        {milestone.fund_percentage}%
-                      </span>
-                    </div>
-                    <p className="text-sm text-ink-secondary">{milestone.description}</p>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className="ml-4 flex-shrink-0">
-                    {milestone.status === 'approved' && (
-                      <div className="flex items-center gap-1">
-                        <CheckCircleIcon className="w-5 h-5 text-green-600" />
-                        <span className="text-xs font-semibold text-green-700">Approved</span>
-                      </div>
-                    )}
-                    {milestone.status === 'submitted' && (
-                      <div className="flex items-center gap-1">
-                        <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                        <span className="text-xs font-semibold text-yellow-700">Reviewing</span>
-                      </div>
-                    )}
-                    {milestone.status === 'pending' && (
-                      <span className="text-xs font-semibold text-ink-secondary">Pending</span>
-                    )}
-                    {milestone.status === 'rejected' && (
-                      <div className="flex items-center gap-1">
-                        <ExclamationCircleIcon className="w-5 h-5 text-red-600" />
-                        <span className="text-xs font-semibold text-red-700">Rejected</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                <AnimatePresence>
-                  {expandedMilestone === milestone.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="border-t border-surface-2 p-4 bg-white"
-                    >
-                      {milestone.status === 'approved' && (
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="text-green-600 font-semibold text-sm mb-4"
-                        >
-                          ✓ Rs {(startup.funding_goal * milestone.fund_percentage) / 100} released to
-                          your account
-                        </motion.p>
-                      )}
-
-                      {milestone.status === 'rejected' && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          className="mb-4 p-3 bg-red-50 rounded-lg"
-                        >
-                          <p className="text-xs font-semibold text-red-700 mb-2">Rejection Reason:</p>
-                          <p className="text-sm text-red-600">
-                            {milestone.rejection_reason ||
-                              'Please resubmit with additional documentation'}
-                          </p>
-                        </motion.div>
-                      )}
-
-                      {canSubmitProof && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onSubmitProof(milestone.id)
-                          }}
-                          disabled={proofSubmitting}
-                          className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-700 transition-colors flex items-center gap-2"
-                        >
-                          <ArrowUpTrayIcon className="w-4 h-4" />
-                          {proofSubmitting ? 'Submitting...' : 'Submit Proof'}
-                        </motion.button>
-                      )}
-
-                      {milestone.status === 'rejected' && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onSubmitProof(milestone.id)
-                          }}
-                          disabled={proofSubmitting}
-                          className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-700 transition-colors flex items-center gap-2"
-                        >
-                          <ArrowUpTrayIcon className="w-4 h-4" />
-                          {proofSubmitting ? 'Submitting...' : 'Resubmit'}
-                        </motion.button>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )
-          })}
-        </div>
-      </motion.div>
+      <MilestoneManagerComponent startup={startup} onSubmitProof={onSubmitProof} proofSubmitting={proofSubmitting} />
 
       {/* Investors */}
       <motion.div
@@ -924,21 +1074,32 @@ const StartupManagementView: React.FC<{ startup: Startup; onSubmitProof: (milest
 // Main Component
 const FounderDashboard: React.FC = () => {
   useAuth()
-  const { startup, loading, saving, createStartup, submitMilestoneProof, refetch } = useFounder()
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const location = useLocation()
+  const { startups, startup, loading, saving, createStartup, submitMilestoneProof, refetch, selectStartup } = useFounder()
+  const [activeTab, setActiveTab] = useState(location.state?.tab || 'dashboard')
   const [showForm, setShowForm] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+
+  React.useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab)
+      window.history.replaceState({}, document.title)
+    }
+  }, [location.state])
 
   const handleFormSuccess = async (formData: FormData) => {
     const created = await createStartup({
       name: formData.name,
       sector: formData.sector,
       tagline: formData.tagline,
-      funding_goal: formData.funding_goal,
-      equity_offered: formData.equity_offered,
+      funding_goal: Number(formData.funding_goal) || 0,
+      equity_offered: Number(formData.equity_offered) || 0,
       story: formData.story,
-      pitch_deck_url: formData.pitch_deck?.name,
-      milestones: formData.milestones,
+      pitch_deck_url: formData.pitch_video_url,
+      milestones: formData.milestones.map((m) => ({
+        ...m,
+        fund_percentage: Number(m.fund_percentage) || 0,
+      })),
     })
 
     if (!created) {
@@ -958,12 +1119,12 @@ const FounderDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-surface-1">
+    <div className="min-h-screen bg-surface-1 flex">
       {/* Sidebar */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Main Content */}
-      <div className="ml-60">
+      <div className="flex-1">
         <div className="p-8">
           {activeTab === 'dashboard' && (
             <>
@@ -999,23 +1160,24 @@ const FounderDashboard: React.FC = () => {
           )}
 
           {activeTab === 'startup' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12"
-            >
-              <p className="text-ink-secondary mb-4">Startup details coming soon</p>
-            </motion.div>
+            <StartupsListView 
+              startups={startups as Startup[]} 
+              onSelect={async (id) => {
+                await selectStartup(id)
+                setActiveTab('dashboard')
+              }}
+              onCreateClick={() => setShowForm(true)}
+            />
           )}
 
           {activeTab === 'milestones' && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12"
-            >
-              <p className="text-ink-secondary mb-4">Milestone tracking coming soon</p>
-            </motion.div>
+            <MilestonesTabView 
+              startups={startups as Startup[]} 
+              activeStartup={startup} 
+              onSelect={selectStartup}
+              onSubmitProof={handleSubmitProof}
+              proofSubmitting={saving}
+            />
           )}
 
           {activeTab === 'documents' && (
@@ -1043,7 +1205,11 @@ const FounderDashboard: React.FC = () => {
       {/* Multi-Step Form Modal */}
       <AnimatePresence>
         {showForm && (
-          <StartupCreationForm onSuccess={handleFormSuccess} onCancel={() => setShowForm(false)} />
+          <StartupCreationForm 
+            onSuccess={handleFormSuccess} 
+            onCancel={() => setShowForm(false)} 
+            isSubmitting={saving}
+          />
         )}
       </AnimatePresence>
     </div>

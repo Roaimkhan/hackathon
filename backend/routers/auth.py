@@ -14,7 +14,12 @@ async def register(body: RegisterRequest):
     """Register a new user with a role (investor / founder)."""
     user = None
     try:
-        auth_response = supabase.auth.sign_up(
+        import os
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL", "")
+        key = os.getenv("SUPABASE_KEY", "")
+        temp_client = create_client(url, key)
+        auth_response = temp_client.auth.sign_up(
             {"email": body.email, "password": body.password}
         )
         user = auth_response.user
@@ -115,7 +120,12 @@ async def register(body: RegisterRequest):
 async def login(body: LoginRequest):
     """Login and receive a Supabase JWT access token."""
     try:
-        auth_response = supabase.auth.sign_in_with_password(
+        import os
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL", "")
+        key = os.getenv("SUPABASE_KEY", "")
+        temp_client = create_client(url, key)
+        auth_response = temp_client.auth.sign_in_with_password(
             {"email": body.email, "password": body.password}
         )
     except Exception as e:
@@ -173,3 +183,28 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "full_name": current_user["full_name"],
         "cnic": current_user.get("cnic"),
     }
+
+# ── PATCH /auth/me (Update Profile) ───────────────────
+from pydantic import BaseModel
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str
+
+@router.patch("/me")
+async def update_profile(
+    body: ProfileUpdateRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update profile attributes like full name."""
+    try:
+        user_pk = user_pk_column()
+        current_user_id = user_id_value(current_user)
+        result = supabase.table("users").update(
+            {"full_name": body.full_name}
+        ).eq(user_pk, current_user_id).execute()
+        return {"message": "Profile updated successfully.", "user": normalize_user_row(result.data[0]) if result.data else None}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Update failed: {str(e)}"
+        )

@@ -69,10 +69,16 @@ const toFounderStartup = (data: any): FounderStartup => ({
 })
 
 export const useFounder = () => {
+	const [startups, setStartups] = useState<FounderStartup[]>([])
 	const [startup, setStartup] = useState<FounderStartup | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+
+	const fetchDetailedStartup = async (id: string) => {
+		const details = await api.get(`/startups/${id}`)
+		return toFounderStartup(details.data)
+	}
 
 	const refetch = useCallback(async () => {
 		if (USE_MOCK || isRuntimeMockEnabled()) {
@@ -86,15 +92,20 @@ export const useFounder = () => {
 
 			const { data } = await api.get('/startups/mine')
 			const rows = (Array.isArray(data) ? data : data?.data || []).map(normalizeStartupRow)
+			const mappedStartups = rows.map((r: any) => toFounderStartup(r))
+
+			setStartups(mappedStartups)
 
 			if (!rows.length) {
 				setStartup(null)
 				return
 			}
 
-			const newest = rows[0]
-			const details = await api.get(`/startups/${newest.id}`)
-			setStartup(toFounderStartup(details.data))
+			// If we already have a selected startup, re-fetch its details
+			// Otherwise default to the newest one
+			const targetId = startup?.id || rows[0].id
+			const detailed = await fetchDetailedStartup(targetId)
+			setStartup(detailed)
 		} catch (err: any) {
 			const message = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to fetch founder startup'
 			setError(message)
@@ -109,6 +120,19 @@ export const useFounder = () => {
 	useEffect(() => {
 		refetch()
 	}, [refetch])
+
+	const selectStartup = async (id: string) => {
+		try {
+			setLoading(true)
+			const detailed = await fetchDetailedStartup(id)
+			setStartup(detailed)
+		} catch (error) {
+			console.error('Failed to select startup:', error)
+			toast.error('Failed to load startup details')
+		} finally {
+			setLoading(false)
+		}
+	}
 
 	const createStartup = useCallback(async (payload: CreateStartupPayload) => {
 		if (USE_MOCK || isRuntimeMockEnabled()) {
@@ -185,6 +209,7 @@ export const useFounder = () => {
 	}, [refetch])
 
 	return {
+		startups,
 		startup,
 		loading,
 		saving,
@@ -192,5 +217,6 @@ export const useFounder = () => {
 		refetch,
 		createStartup,
 		submitMilestoneProof,
+		selectStartup,
 	}
 }
