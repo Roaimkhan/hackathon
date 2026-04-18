@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from typing import Any, Dict
+from config import supabase
+
+
+_COLUMN_CACHE: Dict[str, str] = {}
 
 
 def _alias(row: Dict[str, Any], target: str, *sources: str, default: Any = None) -> Any:
@@ -10,6 +14,85 @@ def _alias(row: Dict[str, Any], target: str, *sources: str, default: Any = None)
         if source in row and row[source] is not None:
             return row[source]
     return default
+
+
+def _column_exists(table: str, column: str) -> bool:
+    try:
+        supabase.table(table).select(column).limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
+def resolve_column(table: str, *candidates: str) -> str:
+    cache_key = f"{table}:{'|'.join(candidates)}"
+    if cache_key in _COLUMN_CACHE:
+        return _COLUMN_CACHE[cache_key]
+
+    for column in candidates:
+        if _column_exists(table, column):
+            _COLUMN_CACHE[cache_key] = column
+            return column
+
+    # Fallback to first candidate to avoid blocking requests.
+    _COLUMN_CACHE[cache_key] = candidates[0]
+    return candidates[0]
+
+
+def created_column(table: str) -> str:
+    return resolve_column(table, "created_at", "time")
+
+
+def user_pk_column() -> str:
+    return resolve_column("users", "id", "uid", "user_id")
+
+
+def startup_pk_column() -> str:
+    return resolve_column("startups", "id", "uid")
+
+
+def startup_founder_column() -> str:
+    return resolve_column("startups", "founder_id", "founder_uid", "user_id")
+
+
+def investment_pk_column() -> str:
+    return resolve_column("investments", "id", "uid")
+
+
+def investment_investor_column() -> str:
+    return resolve_column("investments", "investor_id", "user_id", "uid")
+
+
+def investment_startup_column() -> str:
+    return resolve_column("investments", "startup_id", "startup_uid")
+
+
+def milestone_pk_column() -> str:
+    return resolve_column("milestones", "id", "uid")
+
+
+def milestone_startup_column() -> str:
+    return resolve_column("milestones", "startup_id", "startup_uid")
+
+
+def transaction_user_column() -> str:
+    return resolve_column("transactions", "user_id", "uid", "investor_id")
+
+
+def user_id_value(row: Dict[str, Any]) -> Any:
+    return _alias(row, "id", "uid", "user_id")
+
+
+def startup_id_value(row: Dict[str, Any]) -> Any:
+    return _alias(row, "id", "uid")
+
+
+def investment_investor_value(row: Dict[str, Any]) -> Any:
+    return _alias(row, "investor_id", "user_id", "uid")
+
+
+def investment_startup_value(row: Dict[str, Any]) -> Any:
+    return _alias(row, "startup_id", "startup_uid")
 
 
 def normalize_user_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -47,6 +130,8 @@ def normalize_milestone_row(row: Dict[str, Any]) -> Dict[str, Any]:
     normalized["submitted_at"] = _alias(row, "submitted_at", "updated_at", "created_at", "time")
     normalized["updated_at"] = _alias(row, "updated_at", "submitted_at", "created_at", "time")
     normalized["fund_percentage"] = _alias(row, "fund_percentage", default=0)
+    normalized["startup_id"] = _alias(row, "startup_id", "startup_uid")
+    normalized["startup_uid"] = _alias(row, "startup_uid", "startup_id")
     normalized["rejection_reason"] = _alias(row, "rejection_reason")
     normalized["proof_url"] = _alias(row, "proof_url")
     normalized["status"] = _alias(row, "status", default="pending")
@@ -60,6 +145,7 @@ def normalize_investment_row(row: Dict[str, Any]) -> Dict[str, Any]:
     normalized["created_at"] = _alias(row, "created_at", "time")
     normalized["time"] = _alias(row, "time", "created_at")
     normalized["startup_id"] = _alias(row, "startup_id")
+    normalized["startup_uid"] = _alias(row, "startup_uid", "startup_id")
     normalized["investor_id"] = _alias(row, "investor_id", "user_id")
     normalized["user_id"] = _alias(row, "user_id", "investor_id")
     normalized["amount_pkr"] = _alias(row, "amount_pkr", "amount", default=0)

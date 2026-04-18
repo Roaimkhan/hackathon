@@ -1,7 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from dependencies import require_role
-from compat import normalize_milestone_row
+from compat import (
+    normalize_milestone_row,
+    milestone_pk_column,
+    milestone_startup_column,
+    startup_pk_column,
+    startup_founder_column,
+    user_pk_column,
+    transaction_user_column,
+    user_id_value,
+)
 from schemas import MilestoneSubmitProof, RejectReason
 
 router = APIRouter(prefix="/milestones", tags=["Milestones"])
@@ -16,11 +25,17 @@ async def submit_milestone(
     current_user: dict = Depends(require_role("founder")),
 ):
     """Founder submits proof for milestone completion."""
-    # Fetch milestone and verify ownership through startup
+    milestone_pk = milestone_pk_column()
+    milestone_startup_fk = milestone_startup_column()
+    startup_pk = startup_pk_column()
+    startup_founder_fk = startup_founder_column()
+    current_user_id = user_id_value(current_user)
+
+    # Fetch milestone first, then verify startup ownership without schema-specific join names.
     milestone = (
         supabase.table("milestones")
-        .select("*, startups!startup_id(founder_id)")
-        .eq("id", milestone_id)
+        .select("*")
+        .eq(milestone_pk, milestone_id)
         .maybe_single()
         .execute()
     )
@@ -30,8 +45,16 @@ async def submit_milestone(
             detail="Milestone not found",
         )
 
-    startup_info = milestone.data.get("startups")
-    if not startup_info or startup_info["founder_id"] != current_user["id"]:
+    startup_id = milestone.data.get(milestone_startup_fk)
+    startup_result = (
+        supabase.table("startups")
+        .select("*")
+        .eq(startup_pk, startup_id)
+        .maybe_single()
+        .execute()
+    )
+    startup_info = startup_result.data
+    if not startup_info or startup_info.get(startup_founder_fk) != current_user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't own this startup's milestone",
@@ -46,7 +69,7 @@ async def submit_milestone(
     result = (
         supabase.table("milestones")
         .update({"proof_url": body.proof_url, "status": "submitted"})
-        .eq("id", milestone_id)
+        .eq(milestone_pk, milestone_id)
         .execute()
     )
     return {
@@ -67,11 +90,18 @@ async def approve_milestone(
     Releases the milestone's fund_percentage of the startup's amount_raised
     to the founder's wallet.
     """
-    # Fetch milestone with startup info
+    milestone_pk = milestone_pk_column()
+    milestone_startup_fk = milestone_startup_column()
+    startup_pk = startup_pk_column()
+    startup_founder_fk = startup_founder_column()
+    user_pk = user_pk_column()
+    transaction_user_fk = transaction_user_column()
+
+    # Fetch milestone and then startup info without depending on relation name syntax.
     milestone = (
         supabase.table("milestones")
-        .select("*, startups!startup_id(id, founder_id, amount_raised)")
-        .eq("id", milestone_id)
+        .select("*")
+        .eq(milestone_pk, milestone_id)
         .maybe_single()
         .execute()
     )
@@ -86,7 +116,21 @@ async def approve_milestone(
             detail="Only submitted milestones can be approved",
         )
 
-    startup = milestone.data["startups"]
+    startup_id = milestone.data.get(milestone_startup_fk)
+    startup_result = (
+        supabase.table("startups")
+        .select("*")
+        .eq(startup_pk, startup_id)
+        .maybe_single()
+        .execute()
+    )
+    startup = startup_result.data
+    if not startup:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Startup not found for milestone",
+        )
+
     fund_percentage = milestone.data["fund_percentage"]
     release_amount = round(
         (fund_percentage / 100) * startup["amount_raised"], 2
@@ -94,26 +138,27 @@ async def approve_milestone(
 
     # Update milestone status
     supabase.table("milestones").update({"status": "approved"}).eq(
-        "id", milestone_id
+        milestone_pk, milestone_id
     ).execute()
 
     # Add released funds to founder's wallet
+    founder_id = startup.get(startup_founder_fk)
     founder = (
         supabase.table("users")
         .select("wallet_balance")
-        .eq("id", startup["founder_id"])
+        .eq(user_pk, founder_id)
         .single()
         .execute()
     )
     new_balance = founder.data["wallet_balance"] + release_amount
     supabase.table("users").update({"wallet_balance": new_balance}).eq(
-        "id", startup["founder_id"]
+        user_pk, founder_id
     ).execute()
 
     # Record transaction for fund release
     supabase.table("transactions").insert(
         {
-            "user_id": startup["founder_id"],
+            transaction_user_fk: founder_id,
             "type": "fund_release",
             "amount_pkr": release_amount,
             "reference": f"Milestone approved: {milestone.data['title']}",
@@ -136,10 +181,11 @@ async def reject_milestone(
     current_user: dict = Depends(require_role("admin")),
 ):
     """Admin rejects a milestone submission with a reason."""
+    milestone_pk = milestone_pk_column()
     milestone = (
         supabase.table("milestones")
         .select("status")
-        .eq("id", milestone_id)
+        .eq(milestone_pk, milestone_id)
         .maybe_single()
         .execute()
     )
@@ -157,7 +203,7 @@ async def reject_milestone(
     result = (
         supabase.table("milestones")
         .update({"status": "rejected"})
-        .eq("id", milestone_id)
+        .eq(milestone_pk, milestone_id)
         .execute()
     )
     return {

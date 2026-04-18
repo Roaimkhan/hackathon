@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from dependencies import get_current_user, require_role
-from compat import normalize_user_row
+from compat import normalize_user_row, user_pk_column, user_id_value
 from schemas import RegisterRequest, LoginRequest, KYCRequest
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -29,18 +29,22 @@ async def register(body: RegisterRequest):
             detail="Registration failed: no user returned",
         )
 
+    user_pk = user_pk_column()
+
     # Keep the profile row in sync with auth. Upsert makes retries safe.
     try:
+        payload = {
+            "email": body.email,
+            "role": body.role.value,
+            "full_name": body.full_name,
+            "kyc_status": "pending",
+            "wallet_balance": 0,
+        }
+        payload[user_pk] = user.id
+
         profile_response = supabase.table("users").upsert(
-            {
-                "id": user.id,
-                "email": body.email,
-                "role": body.role.value,
-                "full_name": body.full_name,
-                "kyc_status": "pending",
-                "wallet_balance": 0,
-            },
-            on_conflict="id",
+            payload,
+            on_conflict=user_pk,
         ).execute()
     except Exception as e:
         raise HTTPException(
@@ -101,9 +105,11 @@ async def upload_kyc(
     current_user: dict = Depends(require_role("investor")),
 ):
     """Upload CNIC for KYC. Mock: automatically sets kyc_status to verified."""
+    user_pk = user_pk_column()
+    current_user_id = user_id_value(current_user)
     supabase.table("users").update(
         {"cnic": body.cnic, "kyc_status": "approved"}
-    ).eq("id", current_user["id"]).execute()
+    ).eq(user_pk, current_user_id).execute()
 
     return {
         "message": "KYC approved successfully",

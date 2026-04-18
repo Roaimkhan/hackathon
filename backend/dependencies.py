@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from config import supabase, SUPABASE_KEY
+from compat import normalize_user_row, user_pk_column
 
 security = HTTPBearer()
 
@@ -27,10 +28,11 @@ async def get_current_user(
         )
 
     # Fetch user record from public.users table
+    user_pk = user_pk_column()
     result = (
         supabase.table("users")
         .select("*")
-        .eq("id", user_id)
+        .eq(user_pk, user_id)
         .maybe_single()
         .execute()
     )
@@ -39,7 +41,7 @@ async def get_current_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found in database",
         )
-    return result.data
+    return normalize_user_row(result.data)
 
 
 def require_role(*roles: str):

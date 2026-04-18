@@ -1,7 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from dependencies import require_role
-from compat import normalize_investment_row
+from compat import (
+    normalize_investment_row,
+    startup_pk_column,
+    user_pk_column,
+    user_id_value,
+    investment_investor_column,
+    investment_startup_column,
+    transaction_user_column,
+)
 from schemas import InvestRequest
 
 router = APIRouter(prefix="/invest", tags=["Invest"])
@@ -24,6 +32,13 @@ async def invest(
     - Records investment and transaction
     - Updates startup amount_raised
     """
+    startup_pk = startup_pk_column()
+    user_pk = user_pk_column()
+    investment_investor_fk = investment_investor_column()
+    investment_startup_fk = investment_startup_column()
+    transaction_user_fk = transaction_user_column()
+    current_user_id = user_id_value(current_user)
+
     # Check KYC
     if current_user.get("kyc_status") not in ("approved", "verified"):
         raise HTTPException(
@@ -42,7 +57,7 @@ async def invest(
     startup_result = (
         supabase.table("startups")
         .select("*")
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .eq("status", "active")
         .maybe_single()
         .execute()
@@ -71,7 +86,7 @@ async def invest(
     # Deduct wallet balance
     new_balance = current_user["wallet_balance"] - body.amount_pkr
     supabase.table("users").update({"wallet_balance": new_balance}).eq(
-        "id", current_user["id"]
+        user_pk, current_user_id
     ).execute()
 
     # Update startup amount_raised
@@ -81,7 +96,7 @@ async def invest(
         update_data["status"] = "funded"
 
     supabase.table("startups").update(update_data).eq(
-        "id", startup_id
+        startup_pk, startup_id
     ).execute()
 
     # Record investment
@@ -89,8 +104,8 @@ async def invest(
         supabase.table("investments")
         .insert(
             {
-                "investor_id": current_user["id"],
-                "startup_id": startup_id,
+                investment_investor_fk: current_user_id,
+                investment_startup_fk: startup_id,
                 "amount_pkr": body.amount_pkr,
                 "equity_percent": equity_percent,
             }
@@ -101,7 +116,7 @@ async def invest(
     # Record transaction
     supabase.table("transactions").insert(
         {
-            "user_id": current_user["id"],
+            transaction_user_fk: current_user_id,
             "type": "investment",
             "amount_pkr": body.amount_pkr,
             "reference": f"Investment in {startup['name']}",

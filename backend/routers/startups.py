@@ -2,7 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from config import supabase
 from dependencies import get_current_user, require_role
-from compat import normalize_startup_row, normalize_milestone_row, normalize_investment_row
+from compat import (
+    normalize_startup_row,
+    normalize_milestone_row,
+    normalize_investment_row,
+    created_column,
+    startup_pk_column,
+    startup_founder_column,
+    milestone_startup_column,
+    investment_startup_column,
+    investment_investor_value,
+    user_id_value,
+)
 from schemas import (
     StartupCreate,
     StartupUpdate,
@@ -18,11 +29,12 @@ router = APIRouter(prefix="/startups", tags=["Startups"])
 @router.get("")
 async def list_startups():
     """List all active startups with funding progress."""
+    startup_created = created_column("startups")
     result = (
         supabase.table("startups")
         .select("*")
         .eq("status", "active")
-        .order("created_at", desc=True)
+        .order(startup_created, desc=True)
         .execute()
     )
     startups = result.data or []
@@ -36,11 +48,14 @@ async def my_startups(
     current_user: dict = Depends(require_role("founder")),
 ):
     """Get the founder's own startups."""
+    founder_col = startup_founder_column()
+    startup_created = created_column("startups")
+    current_user_id = user_id_value(current_user)
     result = (
         supabase.table("startups")
         .select("*")
-        .eq("founder_id", current_user["id"])
-        .order("created_at", desc=True)
+        .eq(founder_col, current_user_id)
+        .order(startup_created, desc=True)
         .execute()
     )
     return [normalize_startup_row(row) for row in (result.data or [])]
@@ -53,11 +68,12 @@ async def pending_startups(
     current_user: dict = Depends(require_role("admin")),
 ):
     """List all startups awaiting admin verification."""
+    startup_created = created_column("startups")
     result = (
         supabase.table("startups")
         .select("*")
         .eq("status", "pending")
-        .order("created_at", desc=True)
+        .order(startup_created, desc=True)
         .execute()
     )
     return [normalize_startup_row(row) for row in (result.data or [])]
@@ -68,11 +84,15 @@ async def pending_startups(
 @router.get("/{startup_id}")
 async def get_startup(startup_id: str):
     """Single startup detail with milestones and investor count."""
+    startup_pk = startup_pk_column()
+    milestone_startup_fk = milestone_startup_column()
+    investment_startup_fk = investment_startup_column()
+
     # Fetch startup
     result = (
         supabase.table("startups")
         .select("*")
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .maybe_single()
         .execute()
     )
@@ -86,7 +106,7 @@ async def get_startup(startup_id: str):
     milestones = (
         supabase.table("milestones")
         .select("*")
-        .eq("startup_id", startup_id)
+        .eq(milestone_startup_fk, startup_id)
         .order("order_index")
         .execute()
     ).data or []
@@ -94,11 +114,11 @@ async def get_startup(startup_id: str):
     # Count unique investors
     investments = (
         supabase.table("investments")
-        .select("investor_id")
-        .eq("startup_id", startup_id)
+        .select("*")
+        .eq(investment_startup_fk, startup_id)
         .execute()
     ).data or []
-    investor_ids = set(inv["investor_id"] for inv in investments)
+    investor_ids = {investment_investor_value(inv) for inv in investments if investment_investor_value(inv)}
 
     startup["milestones"] = [normalize_milestone_row(m) for m in milestones]
     startup["investor_count"] = len(investor_ids)
@@ -114,11 +134,13 @@ async def create_startup(
     current_user: dict = Depends(require_role("founder")),
 ):
     """Submit a new startup for admin review."""
+    founder_col = startup_founder_column()
+    current_user_id = user_id_value(current_user)
     result = (
         supabase.table("startups")
         .insert(
             {
-                "founder_id": current_user["id"],
+                founder_col: current_user_id,
                 "name": body.name,
                 "tagline": body.tagline,
                 "sector": body.sector.value,
@@ -144,12 +166,16 @@ async def update_startup(
     current_user: dict = Depends(require_role("founder")),
 ):
     """Update a draft startup before submission."""
+    startup_pk = startup_pk_column()
+    founder_col = startup_founder_column()
+    current_user_id = user_id_value(current_user)
+
     # Verify ownership and draft status
     existing = (
         supabase.table("startups")
         .select("*")
-        .eq("id", startup_id)
-        .eq("founder_id", current_user["id"])
+        .eq(startup_pk, startup_id)
+        .eq(founder_col, current_user_id)
         .maybe_single()
         .execute()
     )
@@ -177,7 +203,7 @@ async def update_startup(
     result = (
         supabase.table("startups")
         .update(update_data)
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .execute()
     )
     return normalize_startup_row(result.data[0])
@@ -191,10 +217,11 @@ async def approve_startup(
     current_user: dict = Depends(require_role("admin")),
 ):
     """Admin approves a startup: status -> active."""
+    startup_pk = startup_pk_column()
     existing = (
         supabase.table("startups")
         .select("status")
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .maybe_single()
         .execute()
     )
@@ -211,7 +238,7 @@ async def approve_startup(
     result = (
         supabase.table("startups")
         .update({"status": "active"})
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .execute()
     )
     return {"message": "Startup approved", "startup": normalize_startup_row(result.data[0])}
@@ -226,10 +253,11 @@ async def reject_startup(
     current_user: dict = Depends(require_role("admin")),
 ):
     """Admin rejects a startup with a reason."""
+    startup_pk = startup_pk_column()
     existing = (
         supabase.table("startups")
         .select("status")
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .maybe_single()
         .execute()
     )
@@ -241,7 +269,7 @@ async def reject_startup(
     result = (
         supabase.table("startups")
         .update({"status": "rejected"})
-        .eq("id", startup_id)
+        .eq(startup_pk, startup_id)
         .execute()
     )
     # NOTE: The reason could be stored in a separate column or audit log.
@@ -260,11 +288,13 @@ async def list_investors(
     current_user: dict = Depends(require_role("admin")),
 ):
     """List all investors in a startup."""
+    investment_startup_fk = investment_startup_column()
+    investment_created = created_column("investments")
     result = (
         supabase.table("investments")
-        .select("*, users!investor_id(full_name, email)")
-        .eq("startup_id", startup_id)
-        .order("created_at", desc=True)
+        .select("*")
+        .eq(investment_startup_fk, startup_id)
+        .order(investment_created, desc=True)
         .execute()
     )
     return [normalize_investment_row(row) for row in (result.data or [])]
@@ -275,10 +305,11 @@ async def list_investors(
 @router.get("/{startup_id}/milestones")
 async def get_milestones(startup_id: str):
     """Get milestones for a startup (public)."""
+    milestone_startup_fk = milestone_startup_column()
     result = (
         supabase.table("milestones")
         .select("*")
-        .eq("startup_id", startup_id)
+        .eq(milestone_startup_fk, startup_id)
         .order("order_index")
         .execute()
     )
@@ -294,12 +325,17 @@ async def add_milestones(
     current_user: dict = Depends(require_role("founder")),
 ):
     """Add milestones to a startup (founder only, own startup)."""
+    startup_pk = startup_pk_column()
+    founder_col = startup_founder_column()
+    milestone_startup_fk = milestone_startup_column()
+    current_user_id = user_id_value(current_user)
+
     # Verify ownership
     existing = (
         supabase.table("startups")
-        .select("id")
-        .eq("id", startup_id)
-        .eq("founder_id", current_user["id"])
+        .select(startup_pk)
+        .eq(startup_pk, startup_id)
+        .eq(founder_col, current_user_id)
         .maybe_single()
         .execute()
     )
@@ -311,7 +347,7 @@ async def add_milestones(
 
     rows = [
         {
-            "startup_id": startup_id,
+            milestone_startup_fk: startup_id,
             "title": m.title,
             "description": m.description,
             "fund_percentage": m.fund_percentage,
