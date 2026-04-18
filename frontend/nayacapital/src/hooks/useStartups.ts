@@ -129,7 +129,7 @@ export const useStartup = (id: string): UseStartupReturn => {
       setError(null)
 
       const { data } = await api.get(`/startups/${id}`)
-      setStartup(normalizeStartupRow(data.data || data))
+      setStartup(normalizeStartupRow(data.data || data) as Startup)
     } catch (err: any) {
       const message = err.response?.data?.detail || err.response?.data?.message || 'Failed to fetch startup'
       setError(message)

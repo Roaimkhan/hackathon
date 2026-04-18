@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
+import { normalizeMilestoneRow, normalizeStartupRow } from '../lib/compat'
 import { motion, AnimatePresence } from 'framer-motion'
 import CountUp from 'react-countup'
 import toast from 'react-hot-toast'
@@ -400,7 +401,7 @@ const StartupsTab: React.FC = () => {
       try {
         setLoading(true)
         const { data } = await api.get('/startups/pending')
-        const rows = Array.isArray(data) ? data : data?.data || []
+        const rows = (Array.isArray(data) ? data : data?.data || []).map(normalizeStartupRow)
 
         setStartups(
           rows.map((row: any) => ({
@@ -409,7 +410,7 @@ const StartupsTab: React.FC = () => {
             founder_name: 'Founder',
             sector: row.sector,
             funding_goal: row.funding_goal || 0,
-            submitted_at: row.created_at || new Date().toISOString(),
+            submitted_at: row.created_at || row.time || new Date().toISOString(),
             story: row.story || '',
             pitch_deck_url: row.pitch_deck_url,
             tagline: row.tagline || '',
@@ -585,12 +586,12 @@ const MilestonesTab: React.FC = () => {
         setLoading(true)
 
         const { data: startupList } = await api.get('/startups')
-        const startupRows = Array.isArray(startupList) ? startupList : startupList?.data || []
+        const startupRows = (Array.isArray(startupList) ? startupList : startupList?.data || []).map(normalizeStartupRow)
 
         const allMilestones = await Promise.all(
           startupRows.map(async (startup: any) => {
             const milestoneResponse = await api.get(`/startups/${startup.id}/milestones`)
-            const rows = Array.isArray(milestoneResponse.data) ? milestoneResponse.data : milestoneResponse.data?.data || []
+            const rows = (Array.isArray(milestoneResponse.data) ? milestoneResponse.data : milestoneResponse.data?.data || []).map(normalizeMilestoneRow)
             return rows
               .filter((m: any) => m.status === 'submitted')
               .map((m: any) => ({
@@ -600,7 +601,7 @@ const MilestonesTab: React.FC = () => {
                 milestone_title: m.title,
                 fund_percentage: m.fund_percentage,
                 fund_amount: ((m.fund_percentage || 0) / 100) * (startup.amount_raised || 0),
-                submitted_at: m.updated_at || m.created_at || new Date().toISOString(),
+                submitted_at: m.updated_at || m.created_at || m.time || new Date().toISOString(),
                 proof_url: m.proof_url || '#',
                 status: m.status,
               }))

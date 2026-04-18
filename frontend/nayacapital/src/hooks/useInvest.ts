@@ -44,7 +44,7 @@ export const useInvest = (): UseInvestReturn => {
           amount_pkr: amountPkr,
         })
 
-        const investment: InvestmentData = normalizeInvestmentRow(data.investment || data)
+        const investment = normalizeInvestmentRow(data.investment || data) as InvestmentData
 
         const equity = investment.equity_percent ?? investment.equity_percentage ?? 0
         toast.success(`✨ Investment successful! You own ${equity.toFixed(3)}% equity`)
