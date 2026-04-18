@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from config import supabase
 from dependencies import get_current_user, require_role
+from compat import normalize_transaction_row, normalize_user_row
 from schemas import DepositRequest
 
 router = APIRouter(prefix="/wallet", tags=["Wallet"])
@@ -50,4 +51,4 @@ async def get_transactions(
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data or []
+    return [normalize_transaction_row(row) for row in (result.data or [])]

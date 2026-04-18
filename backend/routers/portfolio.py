@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from config import supabase
 from dependencies import require_role
+from compat import normalize_investment_row
 
 router = APIRouter(prefix="/portfolio", tags=["Portfolio"])
 
@@ -19,4 +20,5 @@ async def get_portfolio(
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data or []
+    rows = result.data or []
+    return [normalize_investment_row(row) for row in rows]

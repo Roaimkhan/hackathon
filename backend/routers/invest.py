@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from dependencies import require_role
+from compat import normalize_investment_row
 from schemas import InvestRequest
 
 router = APIRouter(prefix="/invest", tags=["Invest"])
@@ -24,10 +25,10 @@ async def invest(
     - Updates startup amount_raised
     """
     # Check KYC
-    if current_user.get("kyc_status") != "verified":
+    if current_user.get("kyc_status") not in ("approved", "verified"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="KYC must be verified before investing",
+            detail="KYC must be approved before investing",
         )
 
     # Check wallet balance
@@ -109,6 +110,6 @@ async def invest(
 
     return {
         "message": "Investment successful",
-        "investment": investment.data[0],
+        "investment": normalize_investment_row(investment.data[0]),
         "new_wallet_balance": new_balance,
     }

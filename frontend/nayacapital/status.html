@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NayaCapital Status</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .section { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+    .good { background: #d4edda; color: #155724; }
+    .bad { background: #f8d7da; color: #721c24; }
+    .info { background: #d1ecf1; color: #0c5460; }
+    code { background: #eee; padding: 2px 5px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>NayaCapital Frontend Status Check</h1>
+  
+  <div class="section info">
+    <h2>System Information</h2>
+    <p>User Agent: <code id="ua"></code></p>
+    <p>Page URL: <code id="url"></code></p>
+    <p>Current Time: <code id="time"></code></p>
+  </div>
+
+  <div class="section">
+    <h2>React App Root</h2>
+    <p>Root element found: <span id="root-status"></span></p>
+    <p>Root element ID: <code>#root</code></p>
+    <p>Root HTML: <code id="root-html"></code></p>
+  </div>
+
+  <div class="section">
+    <h2>Network Status</h2>
+    <p>Main app will load at: <a href="http://localhost:5174/" target="_blank">http://localhost:5174/</a></p>
+    <p id="fetch-status"></p>
+  </div>
+
+  <script>
+    document.getElementById('ua').textContent = navigator.userAgent.substring(0, 50) + '...';
+    document.getElementById('url').textContent = window.location.href;
+    document.getElementById('time').textContent = new Date().toLocaleString();
+
+    const root = document.getElementById('root');
+    if (root) {
+      document.getElementById('root-status').innerHTML = '<span style="color:green">✓ FOUND</span>';
+      const content = root.innerHTML.substring(0, 100);
+      document.getElementById('root-html').textContent = content || '(empty)';
+    } else {
+      document.getElementById('root-status').innerHTML = '<span style="color:red">✗ NOT FOUND</span>';
+    }
+
+    // Check main app
+    fetch('http://localhost:5174/')
+      .then(r => r.text())
+      .then(html => {
+        const hasReact = html.includes('React');
+        const status = document.getElementById('fetch-status');
+        if (html.includes('<div id="root">')) {
+          if (html.includes('<h1')) {
+            status.innerHTML = '<span class="good">✓ Page is rendering content!</span>';
+          } else {
+            status.innerHTML = '<span class="bad">⚠ Root div exists but appears empty</span>';
+          }
+        } else {
+          status.innerHTML = '<span class="bad">✗ Root div not found in HTML</span>';
+        }
+      })
+      .catch(e => {
+        document.getElementById('fetch-status').innerHTML = `<span class="bad">✗ Could not fetch page: ${e.message}</span>`;
+      });
+  </script>
+</body>
+</html>

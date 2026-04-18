@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from dependencies import get_current_user, require_role
+from compat import normalize_user_row
 from schemas import RegisterRequest, LoginRequest, KYCRequest
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -28,19 +29,37 @@ async def register(body: RegisterRequest):
             detail="Registration failed: no user returned",
         )
 
-    # Insert into public.users table
-    supabase.table("users").insert(
-        {
-            "id": user.id,
-            "email": body.email,
-            "role": body.role.value,
-            "full_name": body.full_name,
-            "kyc_status": "pending",
-            "wallet_balance": 0,
-        }
-    ).execute()
+    # Keep the profile row in sync with auth. Upsert makes retries safe.
+    try:
+        profile_response = supabase.table("users").upsert(
+            {
+                "id": user.id,
+                "email": body.email,
+                "role": body.role.value,
+                "full_name": body.full_name,
+                "kyc_status": "pending",
+                "wallet_balance": 0,
+            },
+            on_conflict="id",
+        ).execute()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"User profile save failed: {str(e)}",
+        )
 
-    return {"message": "User registered successfully", "user_id": user.id}
+    if not profile_response.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="User profile save failed: no row returned",
+        )
+
+    return {
+        "message": "User registered successfully",
+        "user_id": user.id,
+        "uid": user.id,
+        "user": normalize_user_row(profile_response.data[0]),
+    }
 
 
 # ── POST /auth/login (Public) ─────────────────────────
@@ -70,6 +89,7 @@ async def login(body: LoginRequest):
         "token_type": "bearer",
         "expires_in": session.expires_in,
         "user_id": auth_response.user.id,
+        "uid": auth_response.user.id,
     }
 
 
@@ -82,10 +102,14 @@ async def upload_kyc(
 ):
     """Upload CNIC for KYC. Mock: automatically sets kyc_status to verified."""
     supabase.table("users").update(
-        {"cnic": body.cnic, "kyc_status": "verified"}
+        {"cnic": body.cnic, "kyc_status": "approved"}
     ).eq("id", current_user["id"]).execute()
 
-    return {"message": "KYC verified successfully", "kyc_status": "verified"}
+    return {
+        "message": "KYC approved successfully",
+        "kyc_status": "approved",
+        "status": "approved",
+    }
 
 
 # ── GET /auth/me (All authenticated) ──────────────────
@@ -94,12 +118,9 @@ async def upload_kyc(
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Return the current user's profile and wallet balance."""
     return {
-        "id": current_user["id"],
+        **normalize_user_row(current_user),
         "email": current_user["email"],
         "role": current_user["role"],
         "full_name": current_user["full_name"],
         "cnic": current_user.get("cnic"),
-        "kyc_status": current_user["kyc_status"],
-        "wallet_balance": current_user["wallet_balance"],
-        "created_at": current_user["created_at"],
     }

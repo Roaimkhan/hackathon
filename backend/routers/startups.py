@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from config import supabase
 from dependencies import get_current_user, require_role
+from compat import normalize_startup_row, normalize_milestone_row, normalize_investment_row
 from schemas import (
     StartupCreate,
     StartupUpdate,
@@ -25,13 +26,7 @@ async def list_startups():
         .execute()
     )
     startups = result.data or []
-    for s in startups:
-        s["funding_progress"] = (
-            round((s["amount_raised"] / s["funding_goal"]) * 100, 2)
-            if s["funding_goal"] > 0
-            else 0
-        )
-    return startups
+    return [normalize_startup_row(s) for s in startups]
 
 
 # ── GET /startups/mine (Founder) ───────────────────────
@@ -48,7 +43,7 @@ async def my_startups(
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data or []
+    return [normalize_startup_row(row) for row in (result.data or [])]
 
 
 # ── GET /startups/pending (Admin) ──────────────────────
@@ -65,7 +60,7 @@ async def pending_startups(
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data or []
+    return [normalize_startup_row(row) for row in (result.data or [])]
 
 
 # ── GET /startups/:id (Public) ─────────────────────────
@@ -85,7 +80,7 @@ async def get_startup(startup_id: str):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Startup not found"
         )
-    startup = result.data
+    startup = normalize_startup_row(result.data)
 
     # Fetch milestones
     milestones = (
@@ -105,13 +100,9 @@ async def get_startup(startup_id: str):
     ).data or []
     investor_ids = set(inv["investor_id"] for inv in investments)
 
-    startup["milestones"] = milestones
+    startup["milestones"] = [normalize_milestone_row(m) for m in milestones]
     startup["investor_count"] = len(investor_ids)
-    startup["funding_progress"] = (
-        round((startup["amount_raised"] / startup["funding_goal"]) * 100, 2)
-        if startup["funding_goal"] > 0
-        else 0
-    )
+    startup["investors_count"] = len(investor_ids)
     return startup
 
 
@@ -141,7 +132,7 @@ async def create_startup(
         )
         .execute()
     )
-    return result.data[0]
+    return normalize_startup_row(result.data[0])
 
 
 # ── PUT /startups/:id (Founder) ────────────────────────
@@ -189,7 +180,7 @@ async def update_startup(
         .eq("id", startup_id)
         .execute()
     )
-    return result.data[0]
+    return normalize_startup_row(result.data[0])
 
 
 # ── POST /startups/:id/approve (Admin) ─────────────────
@@ -223,7 +214,7 @@ async def approve_startup(
         .eq("id", startup_id)
         .execute()
     )
-    return {"message": "Startup approved", "startup": result.data[0]}
+    return {"message": "Startup approved", "startup": normalize_startup_row(result.data[0])}
 
 
 # ── POST /startups/:id/reject (Admin) ──────────────────
@@ -257,7 +248,7 @@ async def reject_startup(
     return {
         "message": "Startup rejected",
         "reason": body.reason,
-        "startup": result.data[0],
+        "startup": normalize_startup_row(result.data[0]),
     }
 
 
@@ -276,7 +267,7 @@ async def list_investors(
         .order("created_at", desc=True)
         .execute()
     )
-    return result.data or []
+    return [normalize_investment_row(row) for row in (result.data or [])]
 
 
 # ── GET /startups/:id/milestones (All authenticated) ───
@@ -291,7 +282,7 @@ async def get_milestones(startup_id: str):
         .order("order_index")
         .execute()
     )
-    return result.data or []
+    return [normalize_milestone_row(row) for row in (result.data or [])]
 
 
 # ── POST /startups/:id/milestones (Founder) ────────────
@@ -331,4 +322,4 @@ async def add_milestones(
     ]
 
     result = supabase.table("milestones").insert(rows).execute()
-    return result.data
+    return [normalize_milestone_row(row) for row in (result.data or [])]

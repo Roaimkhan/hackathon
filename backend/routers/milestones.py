@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from config import supabase
 from dependencies import require_role
+from compat import normalize_milestone_row
 from schemas import MilestoneSubmitProof, RejectReason
 
 router = APIRouter(prefix="/milestones", tags=["Milestones"])
@@ -48,7 +49,10 @@ async def submit_milestone(
         .eq("id", milestone_id)
         .execute()
     )
-    return {"message": "Milestone submitted for review", "milestone": result.data[0]}
+    return {
+        "message": "Milestone submitted for review",
+        "milestone": normalize_milestone_row(result.data[0]),
+    }
 
 
 # ── POST /milestones/:id/approve (Admin) ───────────────
@@ -159,5 +163,5 @@ async def reject_milestone(
     return {
         "message": "Milestone rejected",
         "reason": body.reason,
-        "milestone": result.data[0],
+        "milestone": normalize_milestone_row(result.data[0]),
     }
