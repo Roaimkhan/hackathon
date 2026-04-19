@@ -73,11 +73,28 @@ async def submit_milestone(
         {"proof_url": body.proof_url, "status": "approved"}
     ).eq(milestone_pk, milestone_id).execute()
 
-    # Calculate and release funds immediately
-    fund_percentage = milestone.data["fund_percentage"]
-    release_amount = round(
-        (fund_percentage / 100) * startup_info["amount_raised"], 2
+    # Calculate how much is currently left in escrow.
+    # Escrow balance = amount_raised - sum already released by OTHER approved milestones.
+    all_milestones = (
+        supabase.table("milestones")
+        .select(f"{milestone_pk}, fund_percentage, status")
+        .eq(milestone_startup_fk, startup_id)
+        .execute()
     )
+    already_released_pct = sum(
+        m["fund_percentage"]
+        for m in (all_milestones.data or [])
+        # Exclude the just-approved milestone itself (we just set it to approved above)
+        if m["status"] == "approved" and m[milestone_pk] != milestone_id
+    )
+    amount_raised = startup_info["amount_raised"]
+    already_released_amount = round((already_released_pct / 100) * amount_raised, 2)
+    escrow_balance = max(0.0, amount_raised - already_released_amount)
+
+    # Release fund_percentage% of amount_raised, but never more than what's in escrow.
+    fund_percentage = milestone.data["fund_percentage"]
+    ideal_release = round((fund_percentage / 100) * amount_raised, 2)
+    release_amount = min(ideal_release, escrow_balance)
 
     # Add released funds to founder's wallet
     founder_id = startup_info.get(startup_founder_fk)
