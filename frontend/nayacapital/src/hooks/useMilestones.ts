@@ -10,7 +10,7 @@ interface Milestone {
   title: string
   description?: string
   fund_percentage: number
-  status: 'pending' | 'submitted' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected'
   rejection_reason?: string
   created_at?: string
 }
@@ -92,11 +92,12 @@ export const useSubmitProof = (): UseSubmitProofReturn => {
       setLoading(true)
       setError(null)
 
-      await api.post(`/milestones/${milestoneId}/submit`, {
+      const { data } = await api.post(`/milestones/${milestoneId}/submit`, {
         proof_url: file.name || 'proof-submitted',
       })
 
-      toast.success('Proof submitted! Awaiting admin review...')
+      const amountReleased = data.release_amount || 0
+      toast.success(`✓ Milestone Completed! Rs ${amountReleased.toLocaleString()} released to your wallet`)
       return true
     } catch (err: any) {
       const message = err.response?.data?.detail || err.response?.data?.message || 'Failed to submit proof'

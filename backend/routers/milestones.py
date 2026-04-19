@@ -24,11 +24,13 @@ async def submit_milestone(
     body: MilestoneSubmitProof,
     current_user: dict = Depends(require_role("founder")),
 ):
-    """Founder submits proof for milestone completion."""
+    """Founder submits proof for milestone completion - INSTANT AUTO-APPROVAL & FUND RELEASE."""
     milestone_pk = milestone_pk_column()
     milestone_startup_fk = milestone_startup_column()
     startup_pk = startup_pk_column()
     startup_founder_fk = startup_founder_column()
+    user_pk = user_pk_column()
+    transaction_user_fk = transaction_user_column()
     current_user_id = user_id_value(current_user)
 
     # Fetch milestone first, then verify startup ownership without schema-specific join names.
@@ -66,15 +68,45 @@ async def submit_milestone(
             detail=f"Milestone is already '{milestone.data['status']}', cannot submit",
         )
 
-    result = (
-        supabase.table("milestones")
-        .update({"proof_url": body.proof_url, "status": "submitted"})
-        .eq(milestone_pk, milestone_id)
+    # INSTANT AUTO-APPROVAL: Update milestone status to approved (skip submitted)
+    supabase.table("milestones").update(
+        {"proof_url": body.proof_url, "status": "approved"}
+    ).eq(milestone_pk, milestone_id).execute()
+
+    # Calculate and release funds immediately
+    fund_percentage = milestone.data["fund_percentage"]
+    release_amount = round(
+        (fund_percentage / 100) * startup_info["amount_raised"], 2
+    )
+
+    # Add released funds to founder's wallet
+    founder_id = startup_info.get(startup_founder_fk)
+    founder = (
+        supabase.table("users")
+        .select("wallet_balance")
+        .eq(user_pk, founder_id)
+        .single()
         .execute()
     )
+    new_balance = founder.data["wallet_balance"] + release_amount
+    supabase.table("users").update({"wallet_balance": new_balance}).eq(
+        user_pk, founder_id
+    ).execute()
+
+    # Record transaction for fund release
+    supabase.table("transactions").insert(
+        {
+            transaction_user_fk: founder_id,
+            "type": "fund_release",
+            "amount_pkr": release_amount,
+            "reference": f"Milestone completed: {milestone.data['title']}",
+        }
+    ).execute()
+
     return {
-        "message": "Milestone submitted for review",
-        "milestone": normalize_milestone_row(result.data[0]),
+        "message": "Milestone completed! Funds released instantly to your wallet ✓",
+        "release_amount": release_amount,
+        "milestone_id": milestone_id,
     }
 
 
@@ -110,10 +142,10 @@ async def approve_milestone(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Milestone not found",
         )
-    if milestone.data["status"] != "submitted":
+    if milestone.data["status"] != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only submitted milestones can be approved",
+            detail="Only pending milestones can be approved",
         )
 
     startup_id = milestone.data.get(milestone_startup_fk)

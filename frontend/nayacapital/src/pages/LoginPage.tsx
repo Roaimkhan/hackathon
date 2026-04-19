@@ -197,69 +197,59 @@ export const LoginPage: React.FC = () => {
           style={{ transformStyle: 'preserve-3d' }}
         >
           {/* Header */}
-          <div className="mb-8 border-b border-surface-2 pb-6">
-            <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 border border-brand-200 px-3 py-1 text-xs font-semibold tracking-[0.14em] uppercase text-brand-700 mb-4">
-              Private Member Access
+          <div className="mb-10 border-b border-surface-2 pb-8">
+            <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 border border-brand-200 px-4 py-1.5 text-xs font-bold tracking-widest uppercase text-brand-700 mb-5">
+              ✦ Private Member Access
             </span>
-            <h1 className="font-playfair text-4xl font-bold text-ink-primary mb-2 tracking-tight">
+            <h1 className="font-display text-5xl font-bold text-ink-primary mb-3 tracking-tight leading-tight">
               Welcome back
             </h1>
-            <p className="text-ink-secondary text-[15px]">
+            <p className="text-ink-secondary text-base font-medium leading-relaxed">
               Sign in to your account to continue investing
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-0">
-            <FloatingLabelInput
-              label="Email"
-              type="email"
-              value={email}
-              onChange={setEmail}
-              required
-              error={error.includes('email') ? 'Invalid email' : ''}
-            />
+          <form onSubmit={handleSubmit} className="space-y-8">
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-semibold text-ink-primary mb-3">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@example.com"
+                required
+                className="w-full px-4 py-3 rounded-lg border-2 border-surface-2 focus:border-brand-600 focus:outline-none bg-white/50 text-ink-primary placeholder-ink-secondary/50 transition-all font-medium"
+              />
+            </div>
 
-            {/* Password Input */}
-            <div className="relative mb-6">
-              <div
-                className={`relative border-b-2 transition-colors ${
-                  error ? 'border-red-500' : 'border-surface-2 focus-within:border-brand-600'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <motion.label
-                      animate={{
-                        y: password ? -24 : 0,
-                        fontSize: password ? '12px' : '16px',
-                      }}
-                      transition={{ duration: 0.2 }}
-                      className={`absolute transition-colors ${
-                        password ? 'text-brand-600' : 'text-ink-secondary'
-                      } pointer-events-none`}
-                    >
-                      Password
-                    </motion.label>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-transparent py-3 text-ink-primary outline-none"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-ink-secondary hover:text-ink-primary transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeSlashIcon className="w-5 h-5" />
-                    ) : (
-                      <EyeIcon className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
+            {/* Password Input - Fixed Spacing */}
+            <div>
+              <label className="block text-sm font-semibold text-ink-primary mb-3">
+                Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative border-2 border-surface-2 focus-within:border-brand-600 rounded-lg overflow-hidden transition-all bg-white/50 px-4 py-3 flex items-center gap-3">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="flex-1 bg-transparent text-ink-primary placeholder-ink-secondary/50 outline-none font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-ink-secondary hover:text-ink-primary transition-colors flex-shrink-0"
+                >
+                  {showPassword ? (
+                    <EyeSlashIcon className="w-5 h-5" />
+                  ) : (
+                    <EyeIcon className="w-5 h-5" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -269,12 +259,12 @@ export const LoginPage: React.FC = () => {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{
                   opacity: 1,
-                  x: [0, 10, -10, 10, -10, 0],
+                  x: [0, 8, -8, 0],
                 }}
-                transition={{ duration: 0.5 }}
-                className="bg-red-50 border border-red-200 rounded-xl p-3 mb-6"
+                transition={{ duration: 0.4 }}
+                className="bg-red-50 border-2 border-red-200 rounded-lg p-4"
               >
-                <p className="text-red-600 text-sm">{error}</p>
+                <p className="text-red-700 text-sm font-semibold">{error}</p>
               </motion.div>
             )}
 
@@ -282,19 +272,18 @@ export const LoginPage: React.FC = () => {
             <motion.button
               type="submit"
               disabled={loading}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              animate={loading ? { boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' } : {}}
-              className="w-full bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 text-white font-semibold py-3.5 rounded-xl transition-all duration-300 mt-8 relative overflow-hidden shadow-[0_20px_40px_-18px_rgba(22,163,74,0.75)]"
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98, y: 0 }}
+              className="w-full bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 text-white font-bold py-4 rounded-lg transition-all duration-300 mt-10 relative overflow-hidden shadow-lg hover:shadow-xl"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
+                <span className="flex items-center justify-center gap-3">
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                     className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                   />
-                  Signing in...
+                  <span>Signing in...</span>
                 </span>
               ) : (
                 'Login'
@@ -303,12 +292,12 @@ export const LoginPage: React.FC = () => {
           </form>
 
           {/* Footer */}
-          <div className="mt-8 text-center text-ink-secondary text-sm">
-            <p>
+          <div className="mt-10 pt-8 border-t border-surface-2 text-center">
+            <p className="text-ink-secondary font-medium">
               Don't have an account?{' '}
               <button
                 onClick={() => navigate('/register')}
-                className="text-brand-700 hover:text-brand-800 font-semibold transition-colors"
+                className="text-brand-700 font-bold hover:text-brand-800 transition-colors"
               >
                 Create one
               </button>

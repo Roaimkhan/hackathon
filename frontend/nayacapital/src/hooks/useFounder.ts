@@ -9,7 +9,7 @@ interface FounderMilestone {
 	title: string
 	description: string
 	fund_percentage: number
-	status: 'pending' | 'submitted' | 'approved' | 'rejected'
+	status: 'pending' | 'approved' | 'rejected'
 	rejection_reason?: string
 	order_index?: number
 }

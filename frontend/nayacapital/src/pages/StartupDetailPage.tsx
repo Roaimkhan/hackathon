@@ -173,9 +173,7 @@ const StartupDetailPage: React.FC = () => {
           status:
             m.status === 'approved'
               ? 'completed'
-              : m.status === 'submitted'
-                ? 'in-progress'
-                : 'upcoming',
+              : 'upcoming',
           dueDate: `Step ${m.order_index || 1}`,
         }))
       : MILESTONES

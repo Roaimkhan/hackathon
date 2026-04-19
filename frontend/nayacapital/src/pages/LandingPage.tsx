@@ -4,7 +4,6 @@ import { ArrowRightIcon, PlayIcon, SparklesIcon, CheckCircleIcon, UserGroupIcon 
 import CountUp from 'react-countup'
 import { useNavigate } from 'react-router-dom'
 import RotatingCard from '../components/ui/RotatingCard'
-import GlobeAnimation from '../components/ui/GlobeAnimation'
 import { BlobShape, AvatarStack } from '../components/ui/Shapes'
 import StepCard from '../components/ui/StepCard'
 import StartupCard from '../components/ui/StartupCard'
@@ -25,7 +24,6 @@ const resolveComponent = <T,>(component: T): T => {
 
 const SafeCountUp = resolveComponent(CountUp)
 const SafeRotatingCard = resolveComponent(RotatingCard)
-const SafeGlobeAnimation = resolveComponent(GlobeAnimation)
 const SafeStepCard = resolveComponent(StepCard)
 const SafeStartupCard = resolveComponent(StartupCard)
 const SafeSkeletonCard = resolveComponent(SkeletonCard)
@@ -244,11 +242,11 @@ const LandingPage: React.FC = () => {
                   </h1>
                 </motion.div>
 
-                {/* Line 2: "Rs 1." with animated underline */}
+                {/* Line 2: "Rs 100." with animated underline */}
                 <motion.div variants={lineVariants} className="overflow-hidden">
                   <div className="relative inline-block">
                     <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-bold text-brand-700 leading-tight drop-shadow-[0_8px_24px_rgba(22,163,74,0.25)]">
-                      Rs 1.
+                      Rs 100.
                     </h1>
                     <motion.div
                       initial={{ scaleX: 0 }}
@@ -403,9 +401,143 @@ const LandingPage: React.FC = () => {
         </div>
       </motion.section>
 
-      {/* SECTION 2.5: GLOBE SHOWCASE */}
-      <section className="relative py-8 bg-transparent">
-        <SafeGlobeAnimation />
+      {/* SECTION 2.5: PREMIUM ANIMATED SHOWCASE - Replaces 3D Globe */}
+      <section className="relative py-24 lg:py-32 overflow-hidden bg-gradient-to-br from-brand-50 via-white to-gold-50">
+        {/* Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+            className="absolute -top-32 -right-32 w-96 h-96 rounded-full border border-brand-200/30 opacity-60"
+          />
+          <motion.div
+            animate={{ rotate: -360 }}
+            transition={{ duration: 50, repeat: Infinity, ease: 'linear' }}
+            className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full border border-gold/20 opacity-50"
+          />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-12">
+          {/* Section Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mb-20"
+          >
+            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-ink-primary mb-6 tracking-tight">
+              Investment Made Simple
+            </h2>
+            <p className="text-lg md:text-xl text-ink-secondary max-w-3xl mx-auto leading-relaxed">
+              Join thousands of Pakistanis investing in tomorrow's success stories
+            </p>
+          </motion.div>
+
+          {/* Feature Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                icon: '🎯',
+                title: 'Verified Opportunities',
+                description: 'Carefully curated startups with strong fundamentals and growth potential across Pakistan',
+                color: 'from-brand-500 to-brand-600',
+              },
+              {
+                icon: '💰',
+                title: 'Flexible Investments',
+                description: 'Start investing from just Rs 100 and diversify your portfolio across multiple sectors',
+                color: 'from-gold to-gold-dark',
+              },
+              {
+                icon: '📊',
+                title: 'Real-Time Tracking',
+                description: 'Monitor your investments, track returns, and receive regular milestone updates',
+                color: 'from-green-500 to-green-600',
+              },
+              {
+                icon: '🔐',
+                title: 'Secure & Compliant',
+                description: 'Full regulatory compliance with blockchain-backed equity records and legal protection',
+                color: 'from-blue-500 to-blue-600',
+              },
+              {
+                icon: '🚀',
+                title: 'High Growth Potential',
+                description: 'Average returns of 18.5% annually with access to pre-IPO investment opportunities',
+                color: 'from-purple-500 to-purple-600',
+              },
+              {
+                icon: '👥',
+                title: 'Community Support',
+                description: 'Join 3,240+ Pakistani investors and network with like-minded entrepreneurs',
+                color: 'from-pink-500 to-pink-600',
+              },
+            ].map((feature, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: idx * 0.08 }}
+                viewport={{ once: true }}
+                whileHover={{ y: -8, transition: { duration: 0.3 } }}
+                className="group"
+              >
+                <div className={`h-full rounded-2xl p-8 bg-gradient-to-br ${feature.color} opacity-5 group-hover:opacity-10 transition-all duration-300 absolute inset-0`} />
+                <div className="relative h-full rounded-2xl p-8 border-2 border-white/80 bg-white/95 backdrop-blur-sm shadow-lg group-hover:shadow-2xl group-hover:border-brand-300 transition-all duration-300">
+                  {/* Icon */}
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 3, repeat: Infinity, delay: idx * 0.1 }}
+                    className="text-5xl mb-5 inline-block"
+                  >
+                    {feature.icon}
+                  </motion.div>
+
+                  {/* Content */}
+                  <h3 className="font-display text-xl font-bold text-ink-primary mb-3 group-hover:text-brand-700 transition-colors">
+                    {feature.title}
+                  </h3>
+                  <p className="text-ink-secondary/90 leading-relaxed text-base">
+                    {feature.description}
+                  </p>
+
+                  {/* Hover Accent */}
+                  <motion.div
+                    initial={{ width: 0 }}
+                    whileHover={{ width: '100%' }}
+                    transition={{ duration: 0.3 }}
+                    className={`absolute bottom-0 left-0 h-1 bg-gradient-to-r ${feature.color} rounded-full`}
+                  />
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* CTA Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            viewport={{ once: true }}
+            className="text-center mt-16"
+          >
+            <motion.button
+              onClick={() => navigate('/register')}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              className="px-10 py-5 bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 text-white rounded-full font-bold text-lg flex items-center justify-center gap-3 mx-auto transition-all duration-300 shadow-xl hover:shadow-2xl"
+            >
+              <span>Start Investing Now</span>
+              <motion.div
+                animate={{ x: [0, 6, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                <ArrowRightIcon className="w-6 h-6" />
+              </motion.div>
+            </motion.button>
+          </motion.div>
+        </div>
       </section>
 
       {/* SECTION 3: HOW IT WORKS */}

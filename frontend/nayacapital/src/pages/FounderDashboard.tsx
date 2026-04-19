@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useFounder } from '../hooks'
+import api from '../lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   HomeIcon,
@@ -23,7 +24,7 @@ interface Milestone {
   title: string
   fund_percentage: number
   description: string
-  status: 'pending' | 'submitted' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected'
   rejection_reason?: string
 }
 
@@ -67,7 +68,7 @@ const Sidebar: React.FC<{ activeTab: string; setActiveTab: (tab: string) => void
     { id: 'dashboard', label: 'Dashboard', icon: HomeIcon },
     { id: 'startup', label: 'My Startups', icon: RocketLaunchIcon },
     { id: 'milestones', label: 'Milestones', icon: FlagIcon },
-    { id: 'documents', label: 'Documents', icon: DocumentTextIcon },
+    { id: 'browse', label: 'Browse Startups', icon: DocumentTextIcon },
     { id: 'settings', label: 'Settings', icon: Cog6ToothIcon },
   ]
 
@@ -721,6 +722,16 @@ const StartupsListView: React.FC<{ startups: Startup[], onSelect: (id: string) =
 const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (milestoneId: string) => Promise<void>; proofSubmitting: boolean }> = ({ startup, onSubmitProof, proofSubmitting }) => {
   const [expandedMilestone, setExpandedMilestone] = useState<string | null>(null)
 
+  // Auto-expand first pending milestone for better UX
+  useEffect(() => {
+    if (!expandedMilestone) {
+      const firstPending = startup.milestones?.find(m => m.status === 'pending')
+      if (firstPending) {
+        setExpandedMilestone(firstPending.id)
+      }
+    }
+  }, [startup.milestones, expandedMilestone])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -732,10 +743,16 @@ const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (mi
         Milestone Manager
       </h3>
 
+      {startup.milestones?.length === 0 && (
+        <p className="text-sm text-ink-secondary text-center py-8">
+          No milestones yet. Create milestones when setting up your startup.
+        </p>
+      )}
+
       <div className="space-y-3">
-        {startup.milestones.map((milestone, idx) => {
-          const isPreviousApproved = idx === 0 || startup.milestones[idx - 1].status === 'approved'
-          const canSubmitProof = milestone.status === 'pending' && isPreviousApproved
+        {startup.milestones?.map((milestone, idx) => {
+          const isPreviousApproved = idx === 0 || startup.milestones[idx - 1]?.status === 'approved'
+          const canSubmitProof = (milestone.status === 'pending' || !milestone.status) && isPreviousApproved
 
           return (
             <motion.div
@@ -761,16 +778,10 @@ const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (mi
                   {milestone.status === 'approved' && (
                     <div className="flex items-center gap-1">
                       <CheckCircleIcon className="w-5 h-5 text-green-600" />
-                      <span className="text-xs font-semibold text-green-700">Approved</span>
+                      <span className="text-xs font-semibold text-green-700">Completed ✓</span>
                     </div>
                   )}
-                  {milestone.status === 'submitted' && (
-                    <div className="flex items-center gap-1">
-                      <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-xs font-semibold text-yellow-700">Reviewing</span>
-                    </div>
-                  )}
-                  {milestone.status === 'pending' && (
+                  {(!milestone.status || milestone.status === 'pending') && (
                     <span className="text-xs font-semibold text-ink-secondary">Pending</span>
                   )}
                   {milestone.status === 'rejected' && (
@@ -797,9 +808,21 @@ const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (mi
                         animate={{ opacity: 1 }}
                         className="text-green-600 font-semibold text-sm mb-4"
                       >
-                        ✓ Rs {(startup.funding_goal * milestone.fund_percentage) / 100} released to
-                        your account
+                        ✓ Milestone Completed! Rs {(startup.funding_goal * milestone.fund_percentage) / 100} has been released to your wallet
                       </motion.p>
+                    )}
+
+                    {(!milestone.status || milestone.status === 'pending') && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="mb-4 p-3 bg-blue-50 rounded-lg"
+                      >
+                        <p className="text-xs font-semibold text-blue-700 mb-2">Next Step:</p>
+                        <p className="text-sm text-blue-600">
+                          Upload proof of completion to unlock Rs {Math.round((startup.funding_goal * milestone.fund_percentage) / 100)} in funds
+                        </p>
+                      </motion.div>
                     )}
 
                     {milestone.status === 'rejected' && (
@@ -828,7 +851,7 @@ const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (mi
                         className="bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-brand-700 transition-colors flex items-center gap-2"
                       >
                         <ArrowUpTrayIcon className="w-4 h-4" />
-                        {proofSubmitting ? 'Submitting...' : 'Submit Proof'}
+                        {proofSubmitting ? 'Completing...' : 'Complete Milestone'}
                       </motion.button>
                     )}
 
@@ -1073,12 +1096,15 @@ const StartupManagementView: React.FC<{ startup: Startup; onSubmitProof: (milest
 
 // Main Component
 const FounderDashboard: React.FC = () => {
-  useAuth()
+  const { user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const { startups, startup, loading, saving, createStartup, submitMilestoneProof, refetch, selectStartup } = useFounder()
   const [activeTab, setActiveTab] = useState(location.state?.tab || 'dashboard')
   const [showForm, setShowForm] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [allStartups, setAllStartups] = useState<any[]>([])
+  const [loadingAllStartups, setLoadingAllStartups] = useState(false)
 
   React.useEffect(() => {
     if (location.state?.tab) {
@@ -1086,6 +1112,27 @@ const FounderDashboard: React.FC = () => {
       window.history.replaceState({}, document.title)
     }
   }, [location.state])
+
+  // Fetch all startups for browse tab
+  React.useEffect(() => {
+    const fetchAllStartups = async () => {
+      try {
+        setLoadingAllStartups(true)
+        const response = await api.get('/startups')
+        if (response.data && Array.isArray(response.data)) {
+          setAllStartups(response.data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch startups:', error)
+      } finally {
+        setLoadingAllStartups(false)
+      }
+    }
+
+    if (activeTab === 'browse') {
+      fetchAllStartups()
+    }
+  }, [activeTab])
 
   const handleFormSuccess = async (formData: FormData) => {
     const created = await createStartup({
@@ -1115,6 +1162,16 @@ const FounderDashboard: React.FC = () => {
     const ok = await submitMilestoneProof(milestoneId)
     if (ok) {
       await refetch()
+    }
+  }
+
+  const refreshUser = async () => {
+    try {
+      const response = await api.get('/auth/me')
+      // User context will update automatically
+      return response.data
+    } catch (error) {
+      console.error('Failed to refresh user:', error)
     }
   }
 
@@ -1180,24 +1237,825 @@ const FounderDashboard: React.FC = () => {
             />
           )}
 
-          {activeTab === 'documents' && (
+          {activeTab === 'browse' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12"
+              className="space-y-8"
             >
-              <p className="text-ink-secondary mb-4">Document management coming soon</p>
+              <div>
+                <h2 className="text-3xl font-display font-bold text-ink-primary mb-2">Browse Startups</h2>
+                <p className="text-ink-secondary">Discover other startups and stay updated with the ecosystem</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(allStartups || []).map((s: any, idx: number) => {
+                  const fundingPercentage = (s.amount_raised / s.funding_goal) * 100
+                  const isOwnStartup = startups?.some((own: any) => own.id === s.id)
+                  
+                  return (
+                    <motion.div
+                      key={s.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      whileHover={{ y: -4, boxShadow: '0 12px 24px rgba(0, 0, 0, 0.1)' }}
+                      className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all ${
+                        isOwnStartup 
+                          ? 'border-brand-600 shadow-lg' 
+                          : 'border-surface-2 hover:border-brand-300'
+                      }`}
+                    >
+                      {/* Your Startup Badge */}
+                      {isOwnStartup && (
+                        <div className="mb-3 inline-block bg-brand-50 text-brand-700 px-3 py-1 rounded-full text-xs font-semibold">
+                          Your Startup
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg text-ink-primary truncate">{s.name}</h3>
+                          <span className="text-xs bg-surface-2 text-ink-secondary px-2 py-1 rounded inline-block mt-2 font-medium">
+                            {s.sector}
+                          </span>
+                        </div>
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ml-2 ${
+                          s.status === 'active' ? 'bg-green-500' : 
+                          s.status === 'pending' || s.status === 'under_review' ? 'bg-yellow-500' : 
+                          'bg-blue-500'
+                        }`} />
+                      </div>
+                      
+                      <p className="text-sm text-ink-secondary line-clamp-2 mb-4 h-10">{s.tagline}</p>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-xs mb-1.5">
+                            <span className="text-ink-secondary font-medium">Funded</span>
+                            <span className="font-semibold text-brand-600">{fundingPercentage.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-surface-2 rounded-full h-2.5">
+                            <div 
+                              className="bg-gradient-to-r from-brand-500 to-brand-600 h-2.5 rounded-full" 
+                              style={{ width: `${Math.min(fundingPercentage, 100)}%` }} 
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <div>
+                            <p className="text-xs text-ink-secondary mb-0.5">Raised</p>
+                            <p className="text-sm font-mono font-bold text-ink-primary">Rs {(s.amount_raised / 100000).toFixed(1)}L</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-ink-secondary mb-0.5">Goal</p>
+                            <p className="text-sm font-mono font-bold text-ink-secondary">Rs {(s.funding_goal / 100000).toFixed(1)}L</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 text-xs text-ink-secondary">
+                          <span>👥</span>
+                          <span>{s.investor_count || 0} investors</span>
+                        </div>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => navigate(`/startups/${s.id}`)}
+                        className="w-full mt-4 py-2.5 bg-brand-50 text-brand-600 rounded-lg font-semibold hover:bg-brand-100 transition-colors text-sm"
+                      >
+                        View Details
+                      </motion.button>
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              {(!allStartups || allStartups.length === 0) && (
+                <div className="text-center py-12">
+                  <p className="text-ink-secondary mb-4">No startups to browse yet</p>
+                </div>
+              )}
             </motion.div>
           )}
 
           {activeTab === 'settings' && (
+            <SettingsTabContent user={user} refreshUser={refreshUser} />
+          )}
+        </div>
+      </div>
+
+      {/* Multi-Step Form Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <StartupCreationForm 
+            onSuccess={handleFormSuccess} 
+            onCancel={() => setShowForm(false)} 
+            isSubmitting={saving}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// Settings Tab Content
+const SettingsTabContent: React.FC<{ user: any; refreshUser: () => Promise<void> }> = ({ user, refreshUser }) => {
+  const [isEditing, setIsEditing] = useState(false)
+  const [formData, setFormData] = useState({
+    // Personal Information
+    full_name: user?.full_name || '',
+    email: user?.email || '',
+    phone_number: user?.phone_number || '',
+    location: user?.location || '',
+    bio: user?.bio || '',
+
+    // Company Information
+    company_name: user?.company_name || '',
+    company_description: user?.company_description || '',
+    founded_date: user?.founded_date || '',
+    company_sector: user?.company_sector || '',
+    stage: user?.stage || 'seed',
+
+    // Financial Information
+    company_logo_url: user?.company_logo_url || '',
+    pitch_deck_url: user?.pitch_deck_url || '',
+    website_url: user?.website_url || '',
+    linkedin_url: user?.linkedin_url || '',
+
+    // Team Information
+    team_size: user?.team_size || 1,
+    founder_role: user?.founder_role || '',
+
+    // KYC Status (read-only display)
+    kyc_status: user?.kyc_status || 'pending',
+    identity_verified: user?.identity_verified || false,
+    bank_verified: user?.bank_verified || false,
+  })
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true)
+      const updateData = {
+        full_name: formData.full_name,
+        phone_number: formData.phone_number,
+        location: formData.location,
+        bio: formData.bio,
+        company_name: formData.company_name,
+        company_description: formData.company_description,
+        founded_date: formData.founded_date,
+        company_sector: formData.company_sector,
+        stage: formData.stage,
+        company_logo_url: formData.company_logo_url,
+        pitch_deck_url: formData.pitch_deck_url,
+        website_url: formData.website_url,
+        linkedin_url: formData.linkedin_url,
+        team_size: formData.team_size,
+        founder_role: formData.founder_role,
+      }
+      
+      await api.patch('/auth/me', updateData)
+      await refreshUser()
+      setIsEditing(false)
+      alert('Profile updated successfully!')
+    } catch (error) {
+      console.error('Failed to update profile:', error)
+      alert('Failed to update profile. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  if (!isEditing) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-8"
+      >
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-display font-bold text-ink-primary">Profile Settings</h2>
+            <p className="text-ink-secondary">Manage your founder profile and company information</p>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsEditing(true)}
+            className="bg-brand-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-700 transition-colors"
+          >
+            Edit Profile
+          </motion.button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Personal Information Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white rounded-2xl shadow-md p-6 border border-surface-2"
+          >
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-4">Personal Information</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Full Name</p>
+                <p className="text-ink-primary font-medium">{formData.full_name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Email</p>
+                <p className="text-ink-primary font-medium">{formData.email || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Phone</p>
+                <p className="text-ink-primary font-medium">{formData.phone_number || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Location</p>
+                <p className="text-ink-primary font-medium">{formData.location || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Bio</p>
+                <p className="text-ink-primary font-medium line-clamp-3">{formData.bio || '—'}</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Company Information Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-2xl shadow-md p-6 border border-surface-2"
+          >
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-4">Company Information</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Company Name</p>
+                <p className="text-ink-primary font-medium">{formData.company_name || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Sector</p>
+                <p className="text-ink-primary font-medium">{formData.company_sector || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Stage</p>
+                <span className="inline-block bg-brand-50 text-brand-700 px-3 py-1 rounded-full text-sm font-semibold capitalize">
+                  {formData.stage || '—'}
+                </span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Founded</p>
+                <p className="text-ink-primary font-medium">{formData.founded_date || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Team Size</p>
+                <p className="text-ink-primary font-medium">{formData.team_size} members</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Links & Media Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-2xl shadow-md p-6 border border-surface-2"
+          >
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-4">Links & Media</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Website</p>
+                {formData.website_url ? (
+                  <a href={formData.website_url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 font-medium break-all">
+                    {formData.website_url}
+                  </a>
+                ) : (
+                  <p className="text-ink-primary font-medium">—</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">LinkedIn</p>
+                {formData.linkedin_url ? (
+                  <a href={formData.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 font-medium break-all">
+                    {formData.linkedin_url}
+                  </a>
+                ) : (
+                  <p className="text-ink-primary font-medium">—</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase mb-1">Pitch Deck</p>
+                {formData.pitch_deck_url ? (
+                  <a href={formData.pitch_deck_url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:text-brand-700 font-medium break-all">
+                    View Deck
+                  </a>
+                ) : (
+                  <p className="text-ink-primary font-medium">—</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Verification Status Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-2xl shadow-md p-6 border border-surface-2"
+          >
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-4">Verification Status</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-ink-primary">KYC Verification</p>
+                  <p className="text-xs text-ink-secondary">Know Your Customer</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+                  formData.kyc_status === 'verified' ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'
+                }`}>
+                  {formData.kyc_status}
+                </span>
+              </div>
+              <div className="border-t border-surface-2 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink-primary">Identity Verified</p>
+                  </div>
+                  {formData.identity_verified ? (
+                    <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <ExclamationCircleIcon className="w-5 h-5 text-yellow-600" />
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-ink-primary">Bank Verified</p>
+                  </div>
+                  {formData.bank_verified ? (
+                    <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <ExclamationCircleIcon className="w-5 h-5 text-yellow-600" />
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
+    )
+  }
+
+  // Edit Mode
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-3xl"
+    >
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-3xl font-display font-bold text-ink-primary">Edit Profile</h2>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsEditing(false)}
+          className="text-ink-secondary hover:text-ink-primary"
+        >
+          <XMarkIcon className="w-6 h-6" />
+        </motion.button>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-md p-8 border border-surface-2">
+        <div className="space-y-8">
+          {/* Personal Information Section */}
+          <div>
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-6 pb-4 border-b border-surface-2">
+              Personal Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={formData.full_name}
+                  onChange={(e) => handleInputChange('full_name', e.target.value)}
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={formData.phone_number}
+                  onChange={(e) => handleInputChange('phone_number', e.target.value)}
+                  placeholder="+92..."
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Location</label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  placeholder="City, Country"
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Founder Role</label>
+                <input
+                  type="text"
+                  value={formData.founder_role}
+                  onChange={(e) => handleInputChange('founder_role', e.target.value)}
+                  placeholder="CEO, CTO, etc."
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Bio</label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  placeholder="Tell us about yourself..."
+                  rows={4}
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 resize-none transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Company Information Section */}
+          <div>
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-6 pb-4 border-b border-surface-2">
+              Company Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Company Name</label>
+                <input
+                  type="text"
+                  value={formData.company_name}
+                  onChange={(e) => handleInputChange('company_name', e.target.value)}
+                  placeholder="Your startup name"
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Sector</label>
+                <select
+                  value={formData.company_sector}
+                  onChange={(e) => handleInputChange('company_sector', e.target.value)}
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                >
+                  <option value="">Select Sector</option>
+                  <option value="Fintech">Fintech</option>
+                  <option value="AgriTech">AgriTech</option>
+                  <option value="EdTech">EdTech</option>
+                  <option value="HealthTech">HealthTech</option>
+                  <option value="Retail">Retail</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Startup Stage</label>
+                <select
+                  value={formData.stage}
+                  onChange={(e) => handleInputChange('stage', e.target.value)}
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                >
+                  <option value="seed">Seed</option>
+                  <option value="series_a">Series A</option>
+                  <option value="series_b">Series B</option>
+                  <option value="series_c">Series C</option>
+                  <option value="growth">Growth</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Founded Date</label>
+                <input
+                  type="date"
+                  value={formData.founded_date}
+                  onChange={(e) => handleInputChange('founded_date', e.target.value)}
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Team Size</label>
+                <input
+                  type="number"
+                  value={formData.team_size}
+                  onChange={(e) => handleInputChange('team_size', parseInt(e.target.value) || 1)}
+                  min="1"
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Company Description</label>
+                <textarea
+                  value={formData.company_description}
+                  onChange={(e) => handleInputChange('company_description', e.target.value)}
+                  placeholder="What does your company do?"
+                  rows={4}
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 resize-none transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Links & Media Section */}
+          <div>
+            <h3 className="text-lg font-display font-bold text-ink-primary mb-6 pb-4 border-b border-surface-2">
+              Links & Media
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Website URL</label>
+                <input
+                  type="url"
+                  value={formData.website_url}
+                  onChange={(e) => handleInputChange('website_url', e.target.value)}
+                  placeholder="https://yourcompany.com"
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-ink-primary mb-2">LinkedIn URL</label>
+                <input
+                  type="url"
+                  value={formData.linkedin_url}
+                  onChange={(e) => handleInputChange('linkedin_url', e.target.value)}
+                  placeholder="https://linkedin.com/company/..."
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Pitch Deck URL</label>
+                <input
+                  type="url"
+                  value={formData.pitch_deck_url}
+                  onChange={(e) => handleInputChange('pitch_deck_url', e.target.value)}
+                  placeholder="https://drive.google.com/... or dropbox.com/..."
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-ink-primary mb-2">Company Logo URL</label>
+                <input
+                  type="url"
+                  value={formData.company_logo_url}
+                  onChange={(e) => handleInputChange('company_logo_url', e.target.value)}
+                  placeholder="https://yourcompany.com/logo.png"
+                  className="w-full border-2 border-surface-2 rounded-lg px-4 py-3 focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Buttons */}
+        <div className="flex gap-3 mt-8 pt-8 border-t border-surface-2">
+          <motion.button
+            onClick={() => setIsEditing(false)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex-1 py-3 border-2 border-surface-2 rounded-lg text-ink-primary font-semibold hover:bg-surface-1 transition-colors"
+          >
+            Cancel
+          </motion.button>
+          <motion.button
+            onClick={handleSave}
+            disabled={isSaving}
+            whileHover={{ scale: isSaving ? 1 : 1.02 }}
+            whileTap={{ scale: isSaving ? 1 : 0.98 }}
+            className="flex-1 py-3 bg-brand-600 text-white rounded-lg font-semibold hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// Main Component Return
+const FounderDashboardRender: React.FC<{
+  activeTab: string
+  setActiveTab: (tab: string) => void
+  startups: Startup[]
+  startup: Startup | null
+  loading: boolean
+  saving: boolean
+  showForm: boolean
+  setShowForm: (show: boolean) => void
+  successMessage: string
+  allStartups: any[]
+  handleFormSuccess: (data: FormData) => Promise<void>
+  handleSubmitProof: (milestoneId: string) => Promise<void>
+  refreshUser: () => Promise<void>
+  user: any
+  navigate: any
+  selectStartup: (id: string) => Promise<void>
+}> = ({
+  activeTab,
+  setActiveTab,
+  startups,
+  startup,
+  loading,
+  saving,
+  showForm,
+  setShowForm,
+  successMessage,
+  allStartups,
+  handleFormSuccess,
+  handleSubmitProof,
+  refreshUser,
+  user,
+  navigate,
+  selectStartup,
+}) => {
+  return (
+    <div className="min-h-screen bg-surface-1 flex">
+      {/* Sidebar */}
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* Main Content */}
+      <div className="flex-1">
+        <div className="p-8">
+          {activeTab === 'dashboard' && (
+            <>
+              {successMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mb-6 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-green-700 font-semibold flex items-center gap-2"
+                >
+                  <CheckCircleIcon className="w-5 h-5" />
+                  {successMessage}
+                </motion.div>
+              )}
+
+              {loading ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-16 text-ink-secondary"
+                >
+                  Loading your startup...
+                </motion.div>
+              ) : !startup ? (
+                <NoStartupState onCreateClick={() => setShowForm(true)} />
+              ) : (
+                <StartupManagementView
+                  startup={startup}
+                  onSubmitProof={handleSubmitProof}
+                  proofSubmitting={saving}
+                />
+              )}
+            </>
+          )}
+
+          {activeTab === 'startup' && (
+            <StartupsListView 
+              startups={startups as Startup[]} 
+              onSelect={async (id) => {
+                await selectStartup(id)
+                setActiveTab('dashboard')
+              }}
+              onCreateClick={() => setShowForm(true)}
+            />
+          )}
+
+          {activeTab === 'milestones' && (
+            <MilestonesTabView 
+              startups={startups as Startup[]} 
+              activeStartup={startup} 
+              onSelect={selectStartup}
+              onSubmitProof={handleSubmitProof}
+              proofSubmitting={saving}
+            />
+          )}
+
+          {activeTab === 'browse' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-center py-12"
+              className="space-y-8"
             >
-              <p className="text-ink-secondary mb-4">Settings coming soon</p>
+              <div>
+                <h2 className="text-3xl font-display font-bold text-ink-primary mb-2">Browse Startups</h2>
+                <p className="text-ink-secondary">Discover other startups and stay updated with the ecosystem</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {(allStartups || []).map((s: any, idx: number) => {
+                  const fundingPercentage = (s.amount_raised / s.funding_goal) * 100
+                  const isOwnStartup = startups?.some((own: any) => own.id === s.id)
+                  
+                  return (
+                    <motion.div
+                      key={s.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      whileHover={{ y: -4, boxShadow: '0 12px 24px rgba(0, 0, 0, 0.1)' }}
+                      className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all ${
+                        isOwnStartup 
+                          ? 'border-brand-600 shadow-lg' 
+                          : 'border-surface-2 hover:border-brand-300'
+                      }`}
+                    >
+                      {/* Your Startup Badge */}
+                      {isOwnStartup && (
+                        <div className="mb-3 inline-block bg-brand-50 text-brand-700 px-3 py-1 rounded-full text-xs font-semibold">
+                          Your Startup
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-lg text-ink-primary truncate">{s.name}</h3>
+                          <span className="text-xs bg-surface-2 text-ink-secondary px-2 py-1 rounded inline-block mt-2 font-medium">
+                            {s.sector}
+                          </span>
+                        </div>
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ml-2 ${
+                          s.status === 'active' ? 'bg-green-500' : 
+                          s.status === 'pending' || s.status === 'under_review' ? 'bg-yellow-500' : 
+                          'bg-blue-500'
+                        }`} />
+                      </div>
+                      
+                      <p className="text-sm text-ink-secondary line-clamp-2 mb-4 h-10">{s.tagline}</p>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between text-xs mb-1.5">
+                            <span className="text-ink-secondary font-medium">Funded</span>
+                            <span className="font-semibold text-brand-600">{fundingPercentage.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-surface-2 rounded-full h-2.5">
+                            <div 
+                              className="bg-gradient-to-r from-brand-500 to-brand-600 h-2.5 rounded-full" 
+                              style={{ width: `${Math.min(fundingPercentage, 100)}%` }} 
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <div>
+                            <p className="text-xs text-ink-secondary mb-0.5">Raised</p>
+                            <p className="text-sm font-mono font-bold text-ink-primary">Rs {(s.amount_raised / 100000).toFixed(1)}L</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-ink-secondary mb-0.5">Goal</p>
+                            <p className="text-sm font-mono font-bold text-ink-secondary">Rs {(s.funding_goal / 100000).toFixed(1)}L</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 text-xs text-ink-secondary">
+                          <span>👥</span>
+                          <span>{s.investor_count || 0} investors</span>
+                        </div>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => navigate(`/startups/${s.id}`)}
+                        className="w-full mt-4 py-2.5 bg-brand-50 text-brand-600 rounded-lg font-semibold hover:bg-brand-100 transition-colors text-sm"
+                      >
+                        View Details
+                      </motion.button>
+                    </motion.div>
+                  )
+                })}
+              </div>
+
+              {(!allStartups || allStartups.length === 0) && (
+                <div className="text-center py-12">
+                  <p className="text-ink-secondary mb-4">No startups to browse yet</p>
+                </div>
+              )}
             </motion.div>
+          )}
+
+          {activeTab === 'settings' && (
+            <SettingsTabContent user={user} refreshUser={refreshUser} />
           )}
         </div>
       </div>

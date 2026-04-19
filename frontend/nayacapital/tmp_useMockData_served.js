@@ -303,10 +303,10 @@ export function useSubmitProofMock() {
 			setLoading(true);
 			setError(null);
 			await simulateNetworkDelay(1e3);
-			// Mock: Update milestone status
+			// Mock: Update milestone status - AUTO-APPROVE on submission
 			const milestone = MOCK_MILESTONES.find((m) => m.id === milestoneId);
 			if (milestone) {
-				milestone.status = "submitted";
+				milestone.status = "approved";
 			}
 			return true;
 		} catch (err) {

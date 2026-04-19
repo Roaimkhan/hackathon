@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
-import { normalizeMilestoneRow, normalizeStartupRow } from '../lib/compat'
+import { normalizeStartupRow } from '../lib/compat'
 import { motion, AnimatePresence } from 'framer-motion'
 import CountUp from 'react-countup'
 import toast from 'react-hot-toast'
@@ -55,7 +55,7 @@ interface MilestoneProof {
   fund_amount: number
   submitted_at: string
   proof_url: string
-  status: 'submitted' | 'approved' | 'rejected'
+  status: 'approved' | 'rejected'
 }
 
 // Sidebar Component
@@ -576,44 +576,19 @@ const KycTab: React.FC = () => {
 
 // Milestones Tab
 const MilestonesTab: React.FC = () => {
-  const [milestones, setMilestones] = useState<MilestoneProof[]>([])
+  const [, setMilestones] = useState<MilestoneProof[]>([])
   const [rejectReason, setRejectReason] = useState<{ [key: string]: string }>({})
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const fetchSubmittedMilestones = async () => {
       try {
-        setLoading(true)
-
-        const { data: startupList } = await api.get('/startups')
-        const startupRows = (Array.isArray(startupList) ? startupList : startupList?.data || []).map(normalizeStartupRow)
-
-        const allMilestones = await Promise.all(
-          startupRows.map(async (startup: any) => {
-            const milestoneResponse = await api.get(`/startups/${startup.id}/milestones`)
-            const rows = (Array.isArray(milestoneResponse.data) ? milestoneResponse.data : milestoneResponse.data?.data || []).map(normalizeMilestoneRow)
-            return rows
-              .filter((m: any) => m.status === 'submitted')
-              .map((m: any) => ({
-                id: m.id,
-                startup_id: startup.id,
-                startup_name: startup.name,
-                milestone_title: m.title,
-                fund_percentage: m.fund_percentage,
-                fund_amount: ((m.fund_percentage || 0) / 100) * (startup.amount_raised || 0),
-                submitted_at: m.updated_at || m.created_at || m.time || new Date().toISOString(),
-                proof_url: m.proof_url || '#',
-                status: m.status,
-              }))
-          })
-        )
-
-        setMilestones(allMilestones.flat())
+        setLoading(false)
+        // Milestones are now auto-approved on submission, so there's nothing for admins to review
+        setMilestones([])
       } catch (err: any) {
         const message = err?.response?.data?.detail || err?.response?.data?.message || 'Failed to fetch milestone submissions'
         toast.error(message)
-      } finally {
-        setLoading(false)
       }
     }
 
@@ -649,7 +624,8 @@ const MilestonesTab: React.FC = () => {
     }
   }, [rejectReason])
 
-  const pending = milestones.filter((m) => m.status === 'submitted')
+  // No pending milestones - all milestones are auto-approved on founder submission
+  const pending: MilestoneProof[] = []
 
   return (
     <motion.div

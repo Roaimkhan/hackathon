@@ -206,7 +206,7 @@ def main() -> int:
     milestone_row = supabase.table("milestones").select("*").eq(milestone_pk, milestone_id).maybe_single().execute().data
     require(bool(milestone_row), "Milestone row missing")
     require(milestone_row.get(milestone_startup_fk) == startup_id, "Milestone startup FK mismatch")
-    require(milestone_row.get("status") in {"pending", "submitted", "approved", "rejected"}, "Milestone status missing")
+    require(milestone_row.get("status") in {"pending", "approved", "rejected"}, "Milestone status missing")
 
     print("[6/6] PASS: End-to-end persistence and schema compatibility verified.")
     print(f"Founder: {founder['email']}")

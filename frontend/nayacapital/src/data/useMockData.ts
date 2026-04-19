@@ -342,10 +342,10 @@ export function useSubmitProofMock() {
       setError(null)
       await simulateNetworkDelay(1000) // File upload delay
 
-      // Mock: Update milestone status
+      // Mock: Update milestone status - AUTO-APPROVE on submission
       const milestone = MOCK_MILESTONES.find((m) => m.id === milestoneId)
       if (milestone) {
-        milestone.status = 'submitted'
+        milestone.status = 'approved'
       }
 
       return true
