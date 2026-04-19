@@ -808,7 +808,7 @@ const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (mi
                         animate={{ opacity: 1 }}
                         className="text-green-600 font-semibold text-sm mb-4"
                       >
-                        ✓ Milestone Completed! Rs {(startup.funding_goal * milestone.fund_percentage) / 100} has been released to your wallet
+                        ✓ Milestone Completed! Rs {Math.round((startup.amount_raised * milestone.fund_percentage) / 100).toLocaleString()} has been released to your wallet
                       </motion.p>
                     )}
 
@@ -820,7 +820,7 @@ const MilestoneManagerComponent: React.FC<{ startup: Startup; onSubmitProof: (mi
                       >
                         <p className="text-xs font-semibold text-blue-700 mb-2">Next Step:</p>
                         <p className="text-sm text-blue-600">
-                          Upload proof of completion to unlock Rs {Math.round((startup.funding_goal * milestone.fund_percentage) / 100)} in funds
+                          Upload proof of completion to unlock Rs {Math.round((startup.amount_raised * milestone.fund_percentage) / 100).toLocaleString()} in funds
                         </p>
                       </motion.div>
                     )}
@@ -965,7 +965,7 @@ const StartupManagementView: React.FC<{ startup: Startup; onSubmitProof: (milest
   const approvedMilestones = startup.milestones.filter((m) => m.status === 'approved').length
   const escrowReleased = startup.milestones
     .filter((m) => m.status === 'approved')
-    .reduce((sum, m) => sum + (startup.funding_goal * m.fund_percentage) / 100, 0)
+    .reduce((sum, m) => sum + (startup.amount_raised * m.fund_percentage) / 100, 0)
   const escrowRemaining = startup.amount_raised - escrowReleased
 
   return (
