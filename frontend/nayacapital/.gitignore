@@ -20,5 +20,8 @@ dist-ssr
 *.suo
 *.ntvs*
 *.njsproj
+# ignore all env files
+.env
+.env.*
 *.sln
 *.sw?
