@@ -26,6 +26,7 @@ interface Startup {
   story?: string
   team_size?: number
   min_investment?: number
+  pitch_deck_url?: string
 }
 
 interface Milestone {
@@ -294,30 +295,78 @@ const StartupDetailPage: React.FC = () => {
                 </motion.div>
               )}
 
-              {activeTab === 'pitch' && (
-                <motion.div
-                  key="pitch"
-                  variants={tabVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="hidden"
-                  className="space-y-6"
-                >
-                  <div className="p-8 rounded-xl border-2 border-dashed border-surface-3 bg-surface-1 flex flex-col items-center justify-center h-96">
-                    <SparklesIcon className="w-12 h-12 text-ink-muted mb-4" />
-                    <p className="text-ink-secondary text-center mb-4">
-                      Pitch deck not yet uploaded
-                    </p>
-                    <motion.a
-                      href="/startups"
-                      whileHover={{ scale: 1.05 }}
-                      className="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-medium transition-colors"
-                    >
-                      Download Sample Pitch Deck
-                    </motion.a>
-                  </div>
-                </motion.div>
-              )}
+
+              {activeTab === 'pitch' && (() => {
+                const pitchUrl = (startup as any).pitch_deck_url as string | undefined
+
+                // Convert YouTube watch/short URL → embed URL
+                const getYouTubeEmbed = (url: string): string | null => {
+                  try {
+                    const u = new URL(url)
+                    if (u.hostname.includes('youtube.com') && u.searchParams.get('v')) {
+                      return `https://www.youtube.com/embed/${u.searchParams.get('v')}`
+                    }
+                    if (u.hostname === 'youtu.be') {
+                      return `https://www.youtube.com/embed${u.pathname}`
+                    }
+                  } catch { /* ignore */ }
+                  return null
+                }
+
+                const embedUrl = pitchUrl ? getYouTubeEmbed(pitchUrl) : null
+                const isDirectVideo = pitchUrl && /\.(mp4|webm|ogg)(\?|$)/i.test(pitchUrl)
+
+                return (
+                  <motion.div
+                    key="pitch"
+                    variants={tabVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="hidden"
+                    className="space-y-6"
+                  >
+                    {!pitchUrl ? (
+                      <div className="p-8 rounded-xl border-2 border-dashed border-surface-3 bg-surface-1 flex flex-col items-center justify-center h-64">
+                        <SparklesIcon className="w-10 h-10 text-ink-muted mb-3" />
+                        <p className="text-ink-secondary text-sm text-center">
+                          The founder hasn't uploaded a pitch video yet.
+                        </p>
+                      </div>
+                    ) : embedUrl ? (
+                      <div className="rounded-xl overflow-hidden shadow-lg w-full" style={{ aspectRatio: '16/9' }}>
+                        <iframe
+                          src={embedUrl}
+                          title="Pitch Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          className="w-full h-full"
+                        />
+                      </div>
+                    ) : isDirectVideo ? (
+                      <div className="rounded-xl overflow-hidden shadow-lg bg-black w-full" style={{ aspectRatio: '16/9' }}>
+                        <video src={pitchUrl} controls className="w-full h-full" />
+                      </div>
+                    ) : (
+                      <div className="p-8 rounded-xl border border-surface-3 bg-surface-1 flex flex-col items-center justify-center h-64 gap-4">
+                        <SparklesIcon className="w-10 h-10 text-brand-500" />
+                        <p className="text-ink-secondary text-sm text-center">
+                          Pitch deck available as an external document
+                        </p>
+                        <motion.a
+                          href={pitchUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          whileHover={{ scale: 1.05 }}
+                          className="px-6 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-medium transition-colors"
+                        >
+                          View Pitch Deck ↗
+                        </motion.a>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })()}
+
 
               {activeTab === 'team' && (
                 <motion.div
