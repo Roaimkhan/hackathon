@@ -212,6 +212,7 @@ A storage bucket named **`milestone-proofs`** is required for proof document upl
 3. All protected API endpoints require `Authorization: Bearer <token>` header
 4. Role-based guards (`require_role`) enforce access per endpoint
 
+  
 ---
 
 ## 📡 API Endpoints
