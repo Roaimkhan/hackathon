@@ -302,6 +302,3 @@ Register as Investor →  Browse startups →  Invest PKR      →  Track portfo
 
 ---
 
-## 📄 License
-
-MIT
