@@ -1,6 +1,6 @@
 # NayaCapital — Crowdfunding Platform
 
-> A full-stack equity crowdfunding platform connecting **founders** and **investors** in Pakistan. Founders list startups, define milestones, and raise capital; investors browse and back opportunities with real-time fund tracking.
+> A full-stack equity crowdfunding platform connecting **founders** and **investors** in Pakistan. Founders list startups, define milestones, and raise capital; investors browse and back opportunities with real-time fund 
 
 ---
 
